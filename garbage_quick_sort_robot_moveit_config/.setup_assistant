@@ -1,0 +1,11 @@
+moveit_setup_assistant_config:
+  URDF:
+    package: garbage_quick_sort_robot
+    relative_path: urdf/garbage_quick_sort_robot.urdf
+    xacro_args: ""
+  SRDF:
+    relative_path: config/garbage_quick_sort_robot.srdf
+  CONFIG:
+    author_name: Zhao Yuxuan
+    author_email: zhao0306@e.ntu.edu.sg
+    generated_timestamp: 1664318907

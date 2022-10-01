@@ -1,0 +1,11 @@
+controller_list:
+  - name: fake_garbage_quick_sort_robot_arm_controller
+    type: $(arg fake_execution_type)
+    joints:
+      - joint_1
+      - joint_2
+      - joint_3
+      - joint_4
+initial:  # Define initial robot poses per group
+  - group: garbage_quick_sort_robot_arm
+    pose: home
