@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+    <!-- Camera topic and weights, config and classes files -->
+    <arg name="weights_path"	            default="$(find detector)/weights/yolov5n6.pt"/>
+    
+    <!-- Node -->
+    <node name="detect" pkg="detector" type="detect.py" output="screen">
+        <param name="weights_path"              value="$(arg weights_path)"/>
+    </node>
+
+
+    <!--include file="$(find zed_wrapper)/launch/zedm.launch">
+    </include-->
+</launch>
