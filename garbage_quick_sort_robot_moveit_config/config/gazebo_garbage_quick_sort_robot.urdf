@@ -79,7 +79,7 @@
         <origin xyz="0 0 0.13138" rpy="0 0 0" />
         <parent link="link_1" />
         <child link="link_2" />
-        <axis xyz="0 -1 0" />
+        <axis xyz="0 1 0" />
     </joint>
     <link name="link_3">
         <inertial>
@@ -107,7 +107,7 @@
         <origin xyz="0.236 0 0" rpy="0 0 0" />
         <parent link="link_2" />
         <child link="link_3" />
-        <axis xyz="0 -1 0" />
+        <axis xyz="0 1 0" />
     </joint>
     <link name="link_4">
         <inertial>
@@ -135,7 +135,7 @@
         <origin xyz="0.186 0 0" rpy="0 0 0" />
         <parent link="link_3" />
         <child link="link_4" />
-        <axis xyz="0 -1 0" />
+        <axis xyz="0 1 0" />
     </joint>
     <transmission name="trans_joint_1">
         <type>transmission_interface/SimpleTransmission</type>

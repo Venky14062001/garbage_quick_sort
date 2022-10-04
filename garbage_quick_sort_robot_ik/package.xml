@@ -1,0 +1,16 @@
+<package format="2">
+  <name>garbage_quick_sort_robot_ik</name>
+  <version>1.0.0</version>
+  <description>
+    <p>IK package for garbage_quick_sort_robot</p>
+    <p>This package contains IK calculator for garbage_quick_sort_robot</p>
+  </description>
+  <author>Venkat</author>
+  <maintainer email="venk0023@e.ntu.edu.sg" />
+  <license>BSD</license>
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>rospy</depend>
+  <export>
+    <architecture_independent />
+  </export>
+</package>

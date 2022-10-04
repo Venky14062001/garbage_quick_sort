@@ -9,10 +9,19 @@ find_package(catkin REQUIRED COMPONENTS
 set(MSG_FILES
   EffectorPose.msg
   JointGoal.msg
+  RobotState.msg
+)
+
+set(SRV_FILES
+  RobotStateFbk.srv
 )
 
 add_message_files(
   DIRECTORY msg FILES ${MSG_FILES}
+)
+
+add_service_files(
+  DIRECTORY srv FILES ${SRV_FILES}
 )
 
 generate_messages(
@@ -22,6 +31,6 @@ generate_messages(
 catkin_package(CATKIN_DEPENDS message_runtime std_msgs)
 
 install(
-  DIRECTORY msg/
+  DIRECTORY msg/ srv/
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )

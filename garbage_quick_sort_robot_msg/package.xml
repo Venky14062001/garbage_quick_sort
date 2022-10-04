@@ -3,7 +3,7 @@
   <version>1.0.0</version>
   <description>
     <p>Message package for garbage_quick_sort_robot</p>
-    <p>This package contains message types for garbage_quick_sort_robot robot</p>
+    <p>This package contains message and service types for garbage_quick_sort_robot robot</p>
   </description>
   <author>Venkat</author>
   <maintainer email="venk0023@e.ntu.edu.sg" />
