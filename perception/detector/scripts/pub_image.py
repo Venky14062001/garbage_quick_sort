@@ -7,7 +7,7 @@ from detector.msg import BoundingBox, BoundingBoxes
 from std_msgs.msg import Float32
 
 
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture("test.mp4")
 #"file_example_MP4_480_1_5MG.mp4"
 print(cap.isOpened())
 bridge = CvBridge()

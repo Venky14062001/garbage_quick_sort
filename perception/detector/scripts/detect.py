@@ -5,36 +5,99 @@ import rospy
 from std_msgs.msg import Float32, Int16MultiArray, String
 from sensor_msgs.msg import Image
 from std_srvs.srv import SetBool, SetBoolResponse
+from detection_msgs.srv import yolo, yoloResponse
 from cv_bridge import CvBridge, CvBridgeError
+from garbage_quick_sort_robot_msg.msg import EffectorPose
 import time
 
 # obj detection
 import cv2
 import torch
+import torch.backends.cudnn as cudnn
 import numpy as np
 from math import pi, tan
 print("Using CUDA: ",torch.cuda.is_available())
 
-# Inference
+from pathlib import Path
+import os
+import sys
+
+FILE = Path(__file__).resolve()
+ROOT = FILE.parents[0] / "yolov5"
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))  # add ROOT to PATH
+ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative path
+
+# import from yolov5 submodules
+from models.common import DetectMultiBackend
+from utils.general import (
+    check_img_size,
+    check_requirements,
+    non_max_suppression,
+    scale_coords
+)
+from utils.plots import Annotator, colors
+from utils.torch_utils import select_device
+from utils.augmentations import letterbox
+
+from detection_msgs.msg import BoundingBox, BoundingBoxes
+
 class Detection:
     def __init__(self):
-        self.weights_path = rospy.get_param('~weights_path')
-
-        self.model = torch.hub.load("ultralytics/yolov5","custom", path=self.weights_path)
-        #self.model.classes=[0] #['BIODEGRADABLE', 'CARDBOARD', 'GLASS', 'METAL', 'PAPER', 'PLASTIC']
-
+        # self.weights_path = rospy.get_param('~weights_path')
+        # self.model = torch.hub.load("ultralytics/yolov5","custom", path=self.weights_path)
         self.br = CvBridge()
-        self.distance = 10
+
+        self.conf_thres = rospy.get_param("~confidence_threshold")
+        self.iou_thres = rospy.get_param("~iou_threshold")
+        self.agnostic_nms = rospy.get_param("~agnostic_nms")
+        self.max_det = rospy.get_param("~maximum_detections")
+        self.classes = rospy.get_param("~classes", None)
+        self.line_thickness = rospy.get_param("~line_thickness")
+        self.view_image = rospy.get_param("~view_image")
+        # Initialize weights 
+        weights = rospy.get_param("~weights")
+        self.start_image = False
+        # Initialize model
+        self.device = select_device(str(rospy.get_param("~device","")))
+        self.model = DetectMultiBackend(weights, device=self.device, dnn=rospy.get_param("~dnn"), data=rospy.get_param("~data"))
+        self.stride, self.names, self.pt, self.jit, self.onnx, self.engine = (
+            self.model.stride,
+            self.model.names,
+            self.model.pt,
+            self.model.jit,
+            self.model.onnx,
+            self.model.engine,
+        )
+
+        # Setting inference size
+        self.img_size = [rospy.get_param("~inference_size_w", 640), rospy.get_param("~inference_size_h",480)]
+        self.img_size = check_img_size(self.img_size, s=self.stride)
+
+        # Half
+        self.half = rospy.get_param("~half", False)
+        self.half &= (
+            self.pt or self.jit or self.onnx or self.engine
+        ) and self.device.type != "cpu"  # FP16 supported on limited backends with CUDA
+        if self.pt or self.jit:
+            self.model.model.half() if self.half else self.model.model.float()
+        bs = 1  # batch_size
+        cudnn.benchmark = True  # set True to speed up constant image size inference
+        self.model.warmup(imgsz=(1 if self.pt else bs, 3, *self.img_size), half=self.half)  # warmup   
+
+        self.end_effector_z = 10
+        self.target_z = 4
 
         self.start_image = False
 
         rospy.Subscriber('/zedm/zed_node/left/image_rect_color', Image, self.image_callback)
         rospy.Subscriber('/distance', Float32, self.distance_callback)
 
+        self.found_garbage = False
+        self.pub_target_pose = rospy.Publisher('/garbage_quick_sort/end_effector_pose', EffectorPose, queue_size=10)
+        self.end_effector_pose_msg = EffectorPose()
 
-        self.pub_target_angle = rospy.Publisher('/cmd_out/target_angle', Float32, queue_size=10)
-        self.start_service = rospy.Service('detection_service', SetBool, self.trigger_publish)
-        self.pub_the_msg = True 
+        self.start_service = rospy.Service('detection_service', yolo, self.return_target_xy)
 
         self.boundaries = { # hsv color boundaries
             'red' : np.array([[0,120,5], [5,255,255], [161, 125, 5], [179, 255, 255]]),  # plastic
@@ -45,19 +108,13 @@ class Detection:
 
         self.bgr_colors = {'red':(0,0,255), 'blue':(255,0,0), 'orange':(0,140,255)}
 
-
-        self.x0 = 0
-        self.y0 = 0
-        self.x1 = 0
-        self.y1 = 0
-        self.conf = 0.0
-        self.obj = 10
         self.obj_center = [0,0]
         self.box_xywh = [0,0,0,0]
         self.box_center = [0,0]
 
 
     def image_callback(self, data):
+        self.img_raw = data
         self.bgr_image = self.br.imgmsg_to_cv2(data,"bgr8")
         self.image_height, self.image_width, self.image_chanel = self.bgr_image.shape # (480,640,3)
         self.bgr_image = cv2.circle(self.bgr_image, [self.image_width//2, self.image_height//2], 2,(0,0,255),2)
@@ -65,44 +122,66 @@ class Detection:
 
 
     def distance_callback(self, msg):
-        self.distance = msg.data
+        self.target_z = msg.data
 
 
     def inference(self):
-        results = self.model(self.bgr_image, size=320)  # includes NMS
-        outputs = results.xyxy[0].cpu()
-        if len(outputs) > 100:
-            for i,detection in enumerate(outputs):
-                self.x0 = int(outputs[i][0]) #xmin
-                self.y0 = int(outputs[i][1]) #ymin
-                self.x1 = int(outputs[i][2]) #xmax
-                self.y1 = int(outputs[i][3]) #ymax
-                self.conf = float(outputs[i][4])
-                self.obj = int(outputs[i][5]) #object number
-                self.obj_center = ((self.x0+self.x1)//2,(self.y0+self.y1)//2)
-                #self.bgr_image = cv2.circle(self.bgr_image, [self.obj_center[0], self.obj_center[1]], 2,(0,0,255),2)
+        im, im0 = self.preprocess(self.bgr_image)
+        im = torch.from_numpy(im).to(self.device) 
+        im = im.half() if self.half else im.float()
+        im /= 255
+        if len(im.shape) == 3:
+            im = im[None]
 
-                if self.pub_the_msg == True:
-                    pass  
+        results = self.model(im, augment=False, visualize=False)
+        results = non_max_suppression(
+            results, self.conf_thres, self.iou_thres, self.classes, self.agnostic_nms, max_det=self.max_det
+        )
+        det = results[0].cpu().numpy()
+        bounding_boxes = BoundingBoxes()
+        bounding_boxes.header = self.img_raw.header
+        bounding_boxes.image_header = self.img_raw.header
+        annotator = Annotator(self.bgr_image, line_width=self.line_thickness, example=str(self.names))
 
-                if self.conf > 0.3:
-                    self.bgr_image = cv2.circle(self.bgr_image, [self.obj_center[0], self.obj_center[1]], 2,(0,0,255),2)
-                    
-                    cv2.rectangle(self.bgr_image,(self.x0, self.y0),(self.x1,self.y1),(0,255,0),3)
-                
-                break
+        highest_conf = 0.0
+        if len(det):
+            self.found_garbage = True
+            # Rescale boxes from img_size to im0 size
+            det[:, :4] = scale_coords(im.shape[2:], det[:, :4], im0.shape).round()
 
-        #distance = 15 #cm
+            # Write results
+            for *xyxy, conf, cls in reversed(det):
+                bounding_box = BoundingBox()
+                c = int(cls)
+                # Fill in bounding box message
+                bounding_box.Class = self.names[c]
+                bounding_box.probability = conf 
+                bounding_box.xmin = int(xyxy[0])
+                bounding_box.ymin = int(xyxy[1])
+                bounding_box.xmax = int(xyxy[2])
+                bounding_box.ymax = int(xyxy[3])
 
-        #length = distance * (tan((self.image_width / 2 - self.x0)* 0.08 * pi / 180) + tan((self.x1 - self.image_width / 2) * 0.08* pi /180))
-        self.box_contour()
-        self.color_detect()
-        print(self.ratio_calculate())
+                if conf > highest_conf:
+                    self.obj_center = ((bounding_box.xmin + bounding_box.xmax)//2,(bounding_box.ymin + bounding_box.ymax)//2)
 
-        cv2.imshow("frame",self.bgr_image)
-        if cv2.waitKey(1) == ord('q'):  # q to quit
-            cv2.destroyAllWindows()
-            raise StopIteration  
+                bounding_boxes.bounding_boxes.append(bounding_box)
+
+                # Annotate the image
+                if self.view_image:  # Add bbox to image
+                      # integer class
+                    label = f"{self.names[c]} {conf:.2f}"
+                    annotator.box_label(xyxy, label, color=colors(c, True))
+
+            self.bgr_image = cv2.circle(self.bgr_image, [self.obj_center[0], self.obj_center[1]], 2,(0,0,255),2)
+            # Stream results
+            im0 = annotator.result()
+
+        else:
+            self.found_garbage = False
+
+        cv2.imshow(str(0), self.bgr_image)
+        cv2.waitKey(1)  # 1 millisecond
+
 
 
 
@@ -139,29 +218,31 @@ class Detection:
 
         self.obj_center = center
 
-        try:
-            #print(self.pixel2xy(x,y,self.distance))
-            self.pixel2xy(x,y,self.distance)
-        except UnboundLocalError:
-            pass
+        # try:
+        #     #print(self.pixel2xy(x,y,self.distance))
+        #     self.pixel2xy(x,y,self.distance)
+        # except UnboundLocalError:
+        #     pass
             
             
 
-    def pixel2xy(self, pixel_x, pixel_y, distance): # take center as origin, all units in cm
-        x = distance * tan(0.08 * (pixel_x - self.image_width / 2) * pi / 180)
-        y = distance * tan(0.08 * (self.image_height / 2 - pixel_y) * pi / 180)
+    def pixel2xy(self, pixel_x, pixel_y, z): # take center as origin, all units in cm
+        x = z * tan(0.08 * (pixel_x - self.image_width / 2) * pi / 180)
+        y = z * tan(0.08 * (self.image_height / 2 - pixel_y) * pi / 180)
 
-        return x,y
+        return x/100, y/100 #return in m
 
 
 
-    def trigger_publish(self, request):
-        if request.data:
-            self.pub_the_msg = True
-            return SetBoolResponse(True, "Publishing data...")
-        else:
-            self.pub_the_msg = False
-            return SetBoolResponse(False, "Keep Quiet...")
+    def return_target_xy(self, request): #get z(float),  return x,y float meter status(T/F) 
+        if request.z:
+            if self.found_garbage:
+                target_x, target_y = self.pixel2xy(self.obj_center[0],self.obj_center[1], request.z)
+                return yoloResponse(target_x, target_y ,True)
+
+            else:
+                return yoloResponse(0, 0 ,False)
+
 
 
     def box_contour(self):
@@ -185,7 +266,6 @@ class Detection:
 
 
     def ratio_calculate(self):
-
         try:
             x_ratio = (self.obj_center[0] - self.box_xywh[0]) / self.box_xywh[2]
             y_ratio = (self.obj_center[1] - self.box_xywh[1]) / self.box_xywh[3]
@@ -198,9 +278,29 @@ class Detection:
 
             return x_ratio, y_ratio
 
-
         except ZeroDivisionError:
             return 0,0
+
+
+    def publish_target_pose(self,x,y,z,phi=-90*pi/180):
+
+        self.end_effector_pose_msg.x = x
+        self.end_effector_pose_msg.y = y
+        self.end_effector_pose_msg.z = z #meter
+        self.end_effector_pose_msg.phi = phi #rad
+        
+        self.pub_target_pose.publish(self.end_effector_pose_msg)
+
+
+
+    def preprocess(self, img):
+        img0 = img.copy()
+        img = np.array([letterbox(img, self.img_size, stride=self.stride, auto=self.pt)[0]])
+        # Convert
+        img = img[..., ::-1].transpose((0, 3, 1, 2))  # BGR to RGB, BHWC to BCHW
+        img = np.ascontiguousarray(img)
+
+        return img, img0
 
 
 
@@ -213,9 +313,7 @@ if __name__ == "__main__":
         
         while not rospy.is_shutdown():
             if detection.start_image:
-                
                 detection.inference()
-                #detection.pub_the_msg = True
             rate.sleep()
 
     except (KeyboardInterrupt, StopIteration):
