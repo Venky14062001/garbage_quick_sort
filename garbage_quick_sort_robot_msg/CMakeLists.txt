@@ -14,6 +14,8 @@ set(MSG_FILES
 
 set(SRV_FILES
   RobotStateFbk.srv
+  zFbk.srv
+  EndEffectorPose.srv
 )
 
 add_message_files(
