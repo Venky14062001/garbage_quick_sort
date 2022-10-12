@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import sys
+from traceback import print_tb
 import numpy as np
 
 import rospy
@@ -55,22 +56,26 @@ class GarbageQuickSortRobotROSMoveIt:
 
         # check if goal is commanded
         self.goal_commanded = False
-        self.goal_tolerance = np.array([1e-2, 1e-2, 1e-2, 1e-2])
+        self.goal_tolerance = np.array([0.15, 0.15, 0.15, 0.15])
         # 0 is no goal received, 1 is in progress, 2 is failure, 3 is success
         self.reached_goal = 0
         self.goal_receive_time = None
         self.reach_goal_timeout = 60  # seconds
 
+        # an attempt to solve the constant offset
+        # offset assumed to be proportional to torque experienced (COM calculated)
+        self.home_offset = np.array([0.15708, 0.0698132, 0.0523599])
+        # COM ratios (assumed proportional to lengths IMPORTANT FIRST LINK MASS IS INCORRECT, NOT USED IN COM CALCULATION)
+        self.mass_ratio = np.array([1.0, 1.0, 0.85483870967]) # ratio of links, with max link as 1.0
+
         self.ik_soln_exists = False
         self.moveit_traj_success = False
-
-        # time to cover 1rad angle (based on max angle to cover)
-        self.time_per_rad = np.pi/8
 
         # monitor if need to be activated
         self.active = False
         # we know 0, 1, 3, 5, 7 are related to this class
-        self.active_global_states = [0, 1, 3, 5, 7]
+        # added for test cases
+        self.active_global_states = [0, 1, 3, 5, 7, 11, 12, 13, 14, 18] # [0, 1, 3, 5, 7]
 
         # visualize trajectory in RViz
         self.display_trajectory_publisher = rospy.Publisher(
@@ -129,6 +134,28 @@ class GarbageQuickSortRobotROSMoveIt:
 
         return res
 
+    # this function calculates the offset required 
+    def calculate_offset(self, joint_angles_calc):
+        cosine_sum = np.cos(np.array([joint_angles_calc[1], joint_angles_calc[1] + joint_angles_calc[2], joint_angles_calc[1] + joint_angles_calc[2] + joint_angles_calc[3]]))
+        prod_mass_cosine_sum = np.multiply(self.mass_ratio, cosine_sum)
+
+        num_com_arr_1 = np.array([prod_mass_cosine_sum[0], prod_mass_cosine_sum[0] + prod_mass_cosine_sum[1], 
+                        prod_mass_cosine_sum[0] + prod_mass_cosine_sum[1] + prod_mass_cosine_sum[2]])
+        den_com_arr_1 = np.array([self.mass_ratio[0], self.mass_ratio[0] + self.mass_ratio[1], 
+                        self.mass_ratio[0] + self.mass_ratio[1] + self.mass_ratio[2]])
+
+        num_com_arr_2 = np.array([prod_mass_cosine_sum[1], prod_mass_cosine_sum[1] + prod_mass_cosine_sum[2]])
+        den_com_arr_2 = np.array([self.mass_ratio[1], self.mass_ratio[1] + self.mass_ratio[2]])
+
+        num_com_arr_3 = np.array([prod_mass_cosine_sum[2]])
+        den_com_arr_3 = np.array([self.mass_ratio[2]])
+
+        com_ratio = np.array([np.sum(num_com_arr_1) / np.sum(den_com_arr_1), np.sum(num_com_arr_2) / np.sum(den_com_arr_2), np.sum(num_com_arr_3) / np.sum(den_com_arr_3)])
+        offset_arr = np.multiply(com_ratio, self.home_offset)
+
+        offset_arr = np.append(0.0, offset_arr) # no offset added for joint 0
+        return offset_arr
+
     # update joint state (responsible for updating reached_goal if active)
     def joint_state_callback(self, current_state):
         # ensure all joints are zeroed properly and the axis of rotation is correct
@@ -146,8 +173,7 @@ class GarbageQuickSortRobotROSMoveIt:
                         self.reached_goal = 3
                     # check if goal timeout
                     elif (rospy.Time.now().secs - self.goal_receive_time.secs) > self.reach_goal_timeout:
-                        rospy.logerr(
-                            "Goal timeout reached! Robot not reached goal state!")
+                        rospy.logerr("Goal timeout reached! Robot not reached goal state!")
                         self.reached_goal = 2
                     else:
                         # we can assume this state means goal is in progress (dont know if there is a better way?)
@@ -180,62 +206,13 @@ class GarbageQuickSortRobotROSMoveIt:
         else:
             return 0
 
-    # this function creates the required trajectory message using moveit_plan and a custom time to reach
-    def create_trajectory_msg(self, moveit_plan, max_rotation):
+    # this function creates the required trajectory message using moveit_plan 
+    def create_trajectory_msg(self, moveit_plan):
         traj_msg = JointTrajectory()
-        traj_msg.joint_names = self.joint_names # self.joint_names[0:]
+        traj_msg.joint_names = self.joint_names 
 
-        moveit_joint_traj = moveit_plan[1].joint_trajectory
-        traj_msg.header = moveit_joint_traj.header
-
-        # max time
-        max_time = round(self.time_per_rad * max_rotation)
-        moveit_duration = moveit_joint_traj.points[-1].time_from_start
-
-        # get the ratio between the two durations
-        duration_ratio = max_time / moveit_duration.to_sec()
-
-        for i in range(len(moveit_joint_traj.points)):
-            print(i)
-            tmp_msg = JointTrajectoryPoint()
-            tmp_msg.positions = moveit_joint_traj.points[i].positions # moveit_joint_traj.points[i].positions[1:]
-
-            # calculate the scaled time 
-            scaled_time = duration_ratio * (moveit_joint_traj.points[i].time_from_start).to_sec()
-            scaled_duration = Duration.from_sec(scaled_time)
-
-            if (i==0):
-                scaled_time_prev = 0
-                time_diff = scaled_time - scaled_time_prev
-
-                # cannot take position diff as first point, so just scaling vel and acc down
-                vel_arr = np.array(moveit_joint_traj.points[i].velocities)
-                acc_arr = np.array(moveit_joint_traj.points[i].accelerations)
-                scaled_duration = moveit_joint_traj.points[i].time_from_start
-
-                # vel_arr = np.array(moveit_joint_traj.points[i].velocities) / duration_ratio
-                # acc_arr = np.array(moveit_joint_traj.points[i].accelerations) / duration_ratio
-
-            else:
-                scaled_time_prev = (traj_msg.points[-1].time_from_start).to_sec()
-                time_diff = scaled_time - scaled_time_prev
-
-                pos_arr = np.array(moveit_joint_traj.points[i].positions)
-                prev_pos_arr = np.array(moveit_joint_traj.points[i-1].positions)
-
-                # calculate velocity
-                try:
-                    vel_arr = (pos_arr - prev_pos_arr) / time_diff
-                    prev_vel_arr = np.array(traj_msg.points[-1].velocities)
-                    acc_arr = (vel_arr - prev_vel_arr) / time_diff
-                except RuntimeError:
-                    continue  
-            
-            tmp_msg.velocities = list(vel_arr) # list(vel_arr[1:])
-            tmp_msg.accelerations = list(acc_arr) # list(acc_arr[1:])
-            tmp_msg.time_from_start = scaled_duration # scaled_duration
-
-            traj_msg.points.append(tmp_msg)
+        traj_msg.header = moveit_plan[1].joint_trajectory.header
+        traj_msg.points = moveit_plan[1].joint_trajectory.points
 
         return traj_msg
 
@@ -246,7 +223,7 @@ class GarbageQuickSortRobotROSMoveIt:
         if self.active:
             if self.goal_commanded:
                 print("A goal is already in execution! Aborting the latest send goal to complete the existing one!")
-                pass
+                return
 
             else:
                 req_pose = np.array([pose.x, pose.y, pose.z, pose.phi])
@@ -276,37 +253,41 @@ class GarbageQuickSortRobotROSMoveIt:
                 print("Calculated joint solution is: ")
                 self.iksolver.print_joint_deg(sel_ik_joint_sol)
 
+                # calculate the offset for the joint solution
+                joint_offset = self.calculate_offset(sel_ik_joint_sol)
+                print("Joint offset is; ", joint_offset)
+
                 # using MoveIt!
                 # IMPORTANT: Decide on using joint_limits, velocity_limits in yaml files generated by MoveIt!  
                 # get robot current state, make MoveIt go to that state first, then get MoveIt state again and PLAN
                 moveit_start_joint_vals = self.move_group.get_current_joint_values()
-                moveit_start_joint_vals[0] = 0 #self.joint_state_pos[0]
-                moveit_start_joint_vals[1] = 0 #self.joint_state_pos[1]
-                moveit_start_joint_vals[2] = 0 #self.joint_state_pos[2]
-                moveit_start_joint_vals[3] = 0 #self.joint_state_pos[3]
+                moveit_start_joint_vals[0] = self.joint_state_pos[0]
+                moveit_start_joint_vals[1] = self.joint_state_pos[1]
+                moveit_start_joint_vals[2] = self.joint_state_pos[2]    
+                moveit_start_joint_vals[3] = self.joint_state_pos[3]
 
                 # get MoveIt! to actual motor state
                 self.move_group.go(moveit_start_joint_vals, wait=True)
                 self.move_group.stop()
+                rospy.sleep(1.0)
 
                 # get state again and plan to goal state
-                moveit_goal_joint_vals = self.move_group.get_current_joint_values()
-                moveit_goal_joint_vals[0] = sel_ik_joint_sol[0]
-                moveit_goal_joint_vals[1] = sel_ik_joint_sol[1]
-                moveit_goal_joint_vals[2] = sel_ik_joint_sol[2]
-                moveit_goal_joint_vals[3] = sel_ik_joint_sol[3]
+                moveit_goal_goal_vals = self.move_group.get_current_joint_values() 
+                
+                # add the offset as well
+                moveit_goal_goal_vals[0] = sel_ik_joint_sol[0] + joint_offset[0]
+                moveit_goal_goal_vals[1] = sel_ik_joint_sol[1] + joint_offset[1]
+                moveit_goal_goal_vals[2] = sel_ik_joint_sol[2] + joint_offset[2]
+                moveit_goal_goal_vals[3] = sel_ik_joint_sol[3] + joint_offset[3]
 
-                # when generating trajectory, try to change timestamps``
-                self.move_group.set_joint_value_target(moveit_goal_joint_vals)
+                # when generating trajectory, try to change timestamps
+                self.move_group.set_joint_value_target(moveit_goal_goal_vals)
                 plan = self.move_group.plan()
-
-                # get the max angle to rotate
-                max_angle = np.max(np.abs(sel_ik_joint_sol)) # - self.joint_state_pos)) 
 
                 # check if planning succeeded
                 if (plan[0]):
                     self.moveit_traj_success = True
-                    revise_plan = self.create_trajectory_msg(plan, max_angle)
+                    revise_plan = self.create_trajectory_msg(plan)
                 else:
                     print("MoveIt! unable to plan trajectory!")
                     self.goal_commanded = True
@@ -317,12 +298,13 @@ class GarbageQuickSortRobotROSMoveIt:
 
                 # update goal status
                 self.goal_commanded = True
-                self.current_goal = sel_ik_joint_sol
+                self.current_goal = moveit_goal_goal_vals
                 self.goal_receive_time = rospy.Time.now()
 
                 # also publish to RViz for visualizationan
                 self.move_group.go(wait=True)
                 self.move_group.stop()
+                return
         
         else:
             print("Joint goal received when not active! Ignoring request!")

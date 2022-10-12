@@ -5,9 +5,9 @@
 <robot name="garbage_quick_sort_robot">
     <link name="base_link">
         <inertial>
-            <origin xyz="-5.3193E-19 0 0.025" rpy="0 0 0" />
-            <mass value="0.015708" />
-            <inertia ixx="3.6652E-06" ixy="0" ixz="4.8966E-39" iyy="3.6652E-06" iyz="-7.5888E-39" izz="7.854E-07" />
+            <origin xyz="-5.31932292919015E-19 0 0.025" rpy="0 0 0" />
+            <mass value="0.015707963267949" />
+            <inertia ixx="3.66519142918809E-06" ixy="0" ixz="4.89658094079248E-39" iyy="3.66519142918809E-06" iyz="-7.588784500269E-39" izz="7.85398163397449E-07" />
         </inertial>
         <visual>
             <origin xyz="0 0 0" rpy="0 0 0" />
@@ -15,7 +15,7 @@
                 <mesh filename="package://garbage_quick_sort_robot/meshes/base_link.STL" />
             </geometry>
             <material name="">
-                <color rgba="0.79216 0.81961 0.93333 1" />
+                <color rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
             </material>
         </visual>
         <collision>
@@ -27,9 +27,9 @@
     </link>
     <link name="link_1">
         <inertial>
-            <origin xyz="2.6841E-18 1.1915E-17 0.045321" rpy="0 0 0" />
-            <mass value="0.098659" />
-            <inertia ixx="0.00017459" ixy="2.4703E-22" ixz="-6.3468E-21" iyy="0.00013979" iyz="-4.8845E-21" izz="5.1119E-05" />
+            <origin xyz="2.76803785256884E-19 1.37466054338567E-17 0.0452098847240084" rpy="0 0 0" />
+            <mass value="0.0985454479856908" />
+            <inertia ixx="0.000173459349756366" ixy="-6.14254163131044E-22" ixz="3.71333229999255E-21" iyy="0.000138730938371706" iyz="2.47619162015144E-21" izz="5.10302508014298E-05" />
         </inertial>
         <visual>
             <origin xyz="0 0 0" rpy="0 0 0" />
@@ -37,7 +37,7 @@
                 <mesh filename="package://garbage_quick_sort_robot/meshes/link_1.STL" />
             </geometry>
             <material name="">
-                <color rgba="0.79216 0.81961 0.93333 1" />
+                <color rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
             </material>
         </visual>
         <collision>
@@ -55,9 +55,9 @@
     </joint>
     <link name="link_2">
         <inertial>
-            <origin xyz="0.11804 6.5686E-06 -1.1994E-06" rpy="0 0 0" />
-            <mass value="0.060349" />
-            <inertia ixx="4.5888E-06" ixy="-8.3895E-11" ixz="8.5385E-09" iyy="0.00033599" iyz="3.5716E-11" izz="0.00033156" />
+            <origin xyz="0.0933356518856813 8.19889789753123E-06 -1.49708834648599E-06" rpy="0 0 0" />
+            <mass value="0.0483487129594158" />
+            <inertia ixx="3.67282206632682E-06" ixy="5.59056640138914E-09" ixz="6.70725815697787E-09" iyy="0.000176109264034434" iyz="3.5597692325225E-11" izz="0.000172564836827597" />
         </inertial>
         <visual>
             <origin xyz="0 0 0" rpy="0 0 0" />
@@ -65,7 +65,7 @@
                 <mesh filename="package://garbage_quick_sort_robot/meshes/link_2.STL" />
             </geometry>
             <material name="">
-                <color rgba="0.75294 0.75294 0.75294 1" />
+                <color rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
             </material>
         </visual>
         <collision>
@@ -76,16 +76,16 @@
         </collision>
     </link>
     <joint name="joint_2" type="continuous">
-        <origin xyz="0 0 0.13138" rpy="0 0 0" />
+        <origin xyz="0 0 0.131" rpy="0 0 0" />
         <parent link="link_1" />
         <child link="link_2" />
-        <axis xyz="0 1 0" />
+        <axis xyz="0 -1 0" />
     </joint>
     <link name="link_3">
         <inertial>
-            <origin xyz="0.093445 -1.0596E-05 2.8066E-06" rpy="0 0 0" />
-            <mass value="0.060536" />
-            <inertia ixx="4.66E-06" ixy="-1.4406E-08" ixz="-1.2484E-09" iyy="0.00022042" iyz="-2.5665E-10" izz="0.00021602" />
+            <origin xyz="0.093444934538762 -1.05962001749503E-05 2.80655551698761E-06" rpy="0 0 0" />
+            <mass value="0.0605358880934335" />
+            <inertia ixx="4.65997625475644E-06" ixy="-1.44061712601069E-08" ixz="-1.24839961746318E-09" iyy="0.000220424607385293" iyz="-2.56646262184566E-10" izz="0.000216016422770127" />
         </inertial>
         <visual>
             <origin xyz="0 0 0" rpy="0 0 0" />
@@ -93,7 +93,7 @@
                 <mesh filename="package://garbage_quick_sort_robot/meshes/link_3.STL" />
             </geometry>
             <material name="">
-                <color rgba="0.75294 0.75294 0.75294 1" />
+                <color rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
             </material>
         </visual>
         <collision>
@@ -104,16 +104,16 @@
         </collision>
     </link>
     <joint name="joint_3" type="continuous">
-        <origin xyz="0.236 0 0" rpy="0 0 0" />
+        <origin xyz="0.186 0 0" rpy="0 0 0" />
         <parent link="link_2" />
         <child link="link_3" />
-        <axis xyz="0 1 0" />
+        <axis xyz="0 -1 0" />
     </joint>
     <link name="link_4">
         <inertial>
-            <origin xyz="0.051118 -1.0404E-05 1.1102E-16" rpy="0 0 0" />
-            <mass value="0.028481" />
-            <inertia ixx="2.1355E-06" ixy="-3.3969E-09" ixz="-4.1231E-21" iyy="3.7978E-05" iyz="1.0686E-23" izz="3.5918E-05" />
+            <origin xyz="0.0808689542406464 -6.94903621645494E-06 0" rpy="0 0 0" />
+            <mass value="0.0426411677610806" />
+            <inertia ixx="3.21639882309365E-06" ixy="-8.43140562221866E-09" ixz="-1.0027185306975E-20" iyy="0.000119543292909613" iyz="-1.73207698133633E-23" izz="0.000116440599749008" />
         </inertial>
         <visual>
             <origin xyz="0 0 0" rpy="0 0 0" />
@@ -121,7 +121,7 @@
                 <mesh filename="package://garbage_quick_sort_robot/meshes/link_4.STL" />
             </geometry>
             <material name="">
-                <color rgba="0.75294 0.75294 0.75294 1" />
+                <color rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
             </material>
         </visual>
         <collision>
@@ -135,7 +135,7 @@
         <origin xyz="0.186 0 0" rpy="0 0 0" />
         <parent link="link_3" />
         <child link="link_4" />
-        <axis xyz="0 1 0" />
+        <axis xyz="0 -1 0" />
     </joint>
     <transmission name="trans_joint_1">
         <type>transmission_interface/SimpleTransmission</type>

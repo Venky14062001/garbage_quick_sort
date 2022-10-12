@@ -8,14 +8,14 @@ def deg2rad(val):
     return (val*np.pi)/180
 
 # change these two if robot link lengths change
-link4_length = 0.1
-zOffset = 0.1314 
+link4_length = 0.159
+zOffset = 0.131 
 
 # Obtain all these from RViz
-phi = 10 # this is essentially sum of joint 2, 3, 4
-x = 0.260512
+phi = -90 # this is essentially sum of joint 2, 3, 4
+x = 0.328487
 y = 0.0
-z = 0.455295
+z = 0.25055
 yaw = 0 # value of joint 1
 
 yaw_rad = deg2rad(yaw)
