@@ -8,7 +8,7 @@ import moveit_commander
 from moveit_msgs.msg import DisplayTrajectory
 
 from garbage_quick_sort_robot_msg.msg import EffectorPose, RobotState
-from garbage_quick_sort_robot_msg.srv import RobotStateFbk, RobotStateFbkResponse, EffectorPoseFbk, EffectorPoseFbkResponse
+from garbage_quick_sort_robot_msg.srv import RobotStateFbk, RobotStateFbkResponse, EffectorPoseFbkResponse
 from garbage_quick_sort_robot_ik.gqsIK import GarbageQuickSortRobotIK
 
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
@@ -73,7 +73,8 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
         # 11.0, 5.0, 4.0
         self.home_offset = np.array([0.201986, 0.0872665, 0.0698132])
         # COM ratios (assumed proportional to lengths IMPORTANT FIRST LINK MASS IS INCORRECT, NOT USED IN COM CALCULATION)
-        self.mass_ratio = np.array([1.0, 1.0, 0.85483870967]) # ratio of links, with max link as 1.0
+        # ratio of links, with max link as 1.0
+        self.mass_ratio = np.array([1.0, 1.0, 0.85483870967])
 
         self.ik_soln_exists = False
         self.traj_success = False
@@ -86,7 +87,8 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
         self.active = False
         # we know 0, 1, 3, 5, 7 are related to this class
         # added for test cases
-        self.active_global_states = [0, 1, 3, 5, 7, 11, 12, 13, 14, 18] # [0, 1, 3, 5, 7]
+        self.active_global_states = [0, 1, 3, 5,
+                                     7, 11, 12, 13, 14, 18]  # [0, 1, 3, 5, 7]
 
         # visualize trajectory in RViz
         self.display_trajectory_publisher = rospy.Publisher(
@@ -157,26 +159,30 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
 
         return res
 
-    # this function calculates the offset required 
+    # this function calculates the offset required
     def calculate_offset(self, joint_angles_calc):
-        cosine_sum = np.cos(np.array([joint_angles_calc[1], joint_angles_calc[1] + joint_angles_calc[2], joint_angles_calc[1] + joint_angles_calc[2] + joint_angles_calc[3]]))
+        cosine_sum = np.cos(np.array([joint_angles_calc[1], joint_angles_calc[1] + joint_angles_calc[2],
+                            joint_angles_calc[1] + joint_angles_calc[2] + joint_angles_calc[3]]))
         prod_mass_cosine_sum = np.multiply(self.mass_ratio, cosine_sum)
 
-        num_com_arr_1 = np.array([prod_mass_cosine_sum[0], prod_mass_cosine_sum[0] + prod_mass_cosine_sum[1], 
-                        prod_mass_cosine_sum[0] + prod_mass_cosine_sum[1] + prod_mass_cosine_sum[2]])
-        den_com_arr_1 = np.array([self.mass_ratio[0], self.mass_ratio[0] + self.mass_ratio[1], 
-                        self.mass_ratio[0] + self.mass_ratio[1] + self.mass_ratio[2]])
+        num_com_arr_1 = np.array([prod_mass_cosine_sum[0], prod_mass_cosine_sum[0] + prod_mass_cosine_sum[1],
+                                  prod_mass_cosine_sum[0] + prod_mass_cosine_sum[1] + prod_mass_cosine_sum[2]])
+        den_com_arr_1 = np.array([self.mass_ratio[0], self.mass_ratio[0] + self.mass_ratio[1],
+                                  self.mass_ratio[0] + self.mass_ratio[1] + self.mass_ratio[2]])
 
-        num_com_arr_2 = np.array([prod_mass_cosine_sum[1], prod_mass_cosine_sum[1] + prod_mass_cosine_sum[2]])
-        den_com_arr_2 = np.array([self.mass_ratio[1], self.mass_ratio[1] + self.mass_ratio[2]])
+        num_com_arr_2 = np.array(
+            [prod_mass_cosine_sum[1], prod_mass_cosine_sum[1] + prod_mass_cosine_sum[2]])
+        den_com_arr_2 = np.array(
+            [self.mass_ratio[1], self.mass_ratio[1] + self.mass_ratio[2]])
 
         num_com_arr_3 = np.array([prod_mass_cosine_sum[2]])
         den_com_arr_3 = np.array([self.mass_ratio[2]])
 
-        com_ratio = np.array([np.sum(num_com_arr_1) / np.sum(den_com_arr_1), np.sum(num_com_arr_2) / np.sum(den_com_arr_2), np.sum(num_com_arr_3) / np.sum(den_com_arr_3)])
+        com_ratio = np.array([np.sum(num_com_arr_1) / np.sum(den_com_arr_1), np.sum(
+            num_com_arr_2) / np.sum(den_com_arr_2), np.sum(num_com_arr_3) / np.sum(den_com_arr_3)])
         offset_arr = np.multiply(com_ratio, self.home_offset)
 
-        offset_arr = np.append(0.0, offset_arr) # no offset added for joint 0
+        offset_arr = np.append(0.0, offset_arr)  # no offset added for joint 0
         return offset_arr
 
     # update joint state (responsible for updating reached_goal if active)
@@ -238,17 +244,19 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
         # find the max angle from the diff
         max_joint_angle = np.max(diff_joint_states)
 
-        # find the time to go to the angle 
+        # find the time to go to the angle
         traj_time = round(max_joint_angle * self.time_per_rad)
 
         traj_msg = JointTrajectory()
         head = Header()
-        head.stamp = rospy.Time.now() 
+        head.stamp = rospy.Time.now()
         traj_msg.header = head
-        traj_msg.joint_names = self.joint_names # self.joint_names[0:] self.joint_names
+        # self.joint_names[0:] self.joint_names
+        traj_msg.joint_names = self.joint_names
 
-        # create a time vector 
-        time_vec = np.linspace(0, traj_time, round(self.time_steps_per_sec * traj_time))
+        # create a time vector
+        time_vec = np.linspace(0, traj_time, round(
+            self.time_steps_per_sec * traj_time))
 
         # use robotics toolbox to compute trajectory
         try:
@@ -259,9 +267,9 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
         for i in range(len(gen_traj)):
             tmp_traj_pt = JointTrajectoryPoint()
 
-            tmp_traj_pt.positions = gen_traj.s[i] 
-            tmp_traj_pt.velocities = gen_traj.sd[i] 
-            tmp_traj_pt.accelerations = gen_traj.sdd[i] 
+            tmp_traj_pt.positions = gen_traj.s[i]
+            tmp_traj_pt.velocities = gen_traj.sd[i]
+            tmp_traj_pt.accelerations = gen_traj.sdd[i]
 
             tmp_traj_pt.time_from_start = Duration(time_vec[i])
 
@@ -275,7 +283,8 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
         # only send goal if there is no current goal in execution
         if self.active:
             if self.goal_commanded:
-                print("A goal is already in execution! Aborting the latest send goal to complete the existing one!")
+                print(
+                    "A goal is already in execution! Aborting the latest send goal to complete the existing one!")
                 return
 
             else:
@@ -297,7 +306,8 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
                     sel_ik_joint_sol = ik_joint_sol["ED"]
                     self.ik_soln_exists = True
                 else:
-                    rospy.logerr("No valid joint IK solution found! Aborting pose goal request")
+                    rospy.logerr(
+                        "No valid joint IK solution found! Aborting pose goal request")
                     self.ik_soln_exists = False
                     self.goal_commanded = True
                     return
@@ -336,10 +346,14 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
                 # add offset to joint_goa;
                 sel_ik_joint_sol_off = copy.deepcopy(sel_ik_joint_sol)
 
-                sel_ik_joint_sol_off[0] = - sel_ik_joint_sol[0] #+ joint_offset[0]
-                sel_ik_joint_sol_off[1] = sel_ik_joint_sol[1] #+ joint_offset[1]
-                sel_ik_joint_sol_off[2] = sel_ik_joint_sol[2] #+ joint_offset[2]
-                sel_ik_joint_sol_off[3] = sel_ik_joint_sol[3] #+ joint_offset[3]
+                sel_ik_joint_sol_off[0] = - \
+                    sel_ik_joint_sol[0]  # + joint_offset[0]
+                # + joint_offset[1]
+                sel_ik_joint_sol_off[1] = sel_ik_joint_sol[1]
+                # + joint_offset[2]
+                sel_ik_joint_sol_off[2] = sel_ik_joint_sol[2]
+                # + joint_offset[3]
+                sel_ik_joint_sol_off[3] = sel_ik_joint_sol[3]
 
                 sel_ik_joint_sol_off = np.array(sel_ik_joint_sol_off)
                 revise_plan = self.create_trajectory_msg(sel_ik_joint_sol_off)
@@ -351,7 +365,7 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
                     print("Toolbox unable to plan trajectory!")
                     self.goal_commanded = True
                     self.traj_success = False
-                    return 
+                    return
 
                 self.joint_goal_publisher.publish(revise_plan[1])
 
@@ -363,14 +377,7 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
                 # also publish to RViz for visualization
                 self.move_group.go(wait=True)
                 self.move_group.stop()
-        
+
         else:
             print("Joint goal received when not active! Ignoring request!")
             return
-
-
-    
-            
-   
-
-
