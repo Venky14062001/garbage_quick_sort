@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <launch>
     <!-- Camera topic and weights, config and classes files -->
-    <arg name="weights"	            default="$(find detector)/weights/roboflow_garbage_data.pt"/>
+    <arg name="weights"	            default="$(find detector)/weights/3_class_garbage.pt"/>
     <arg name="data"                  default="$(find detector)/scripts/yolov5/data/coco128.yaml"/>
     <arg name="confidence_threshold"  default="0.75"/>
     <arg name="iou_threshold"         default="0.45"/>
@@ -15,7 +15,14 @@
     <!-- replace imgsz -->
     <arg name="inference_size_h"      default="320"/>
     <arg name="inference_size_w"      default="320"/>
-    <arg name="view_image"            default="true"/>    
+    <arg name="view_image"            default="true"/>
+
+    <!-- ros topics -->
+    <arg name="image_topic"                                 default="/garbage_quick_sort/camera/image"/>
+    <arg name="global_robot_state_topic"                    default="/garbage_quick_sort/global_state"/>
+    <arg name="RobotStateFbk_service"                       default="/garbage_quick_sort/response_RobotStateFbk"/>
+    <arg name="z_service"                                   default="/garbage_quick_sort/z_service"/>
+    <arg name="camera_frame_end_effector_pose_topic"        default="/garbage_quick_sort/camera_frame/end_effector_pose"/>
 
     <!-- Node -->
     <node name="detect" pkg="detector" type="detect.py" output="screen">

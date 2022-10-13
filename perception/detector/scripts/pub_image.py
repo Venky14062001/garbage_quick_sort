@@ -7,7 +7,7 @@ from detector.msg import BoundingBox, BoundingBoxes
 from std_msgs.msg import Float32
 
 
-cap = cv2.VideoCapture("test.mp4")
+cap = cv2.VideoCapture(0)
 #"file_example_MP4_480_1_5MG.mp4"
 print(cap.isOpened())
 bridge = CvBridge()
@@ -18,7 +18,7 @@ def callback(BoundingBoxes):
 '''
 
 def talker():
-	pub = rospy.Publisher('/zedm/zed_node/left/image_rect_color', Image, queue_size = 10)
+	pub = rospy.Publisher('/garbage_quick_sort/camera/image', Image, queue_size = 10)
 	rospy.init_node('image', anonymous = False)
 	rate = rospy.Rate(100)
 	while not rospy.is_shutdown():

@@ -2,13 +2,16 @@
 
 # ros import
 import rospy
-from std_msgs.msg import Float32, Int16MultiArray, String
+from std_msgs.msg import Float32,Int16
 from sensor_msgs.msg import Image
 from std_srvs.srv import SetBool, SetBoolResponse
-from detection_msgs.srv import yolo, yoloResponse
 from cv_bridge import CvBridge, CvBridgeError
-from garbage_quick_sort_robot_msg.msg import EffectorPose
-import time
+
+# custom msg and srv
+from garbage_quick_sort_robot_msg.msg import EffectorPose, RobotState
+from garbage_quick_sort_robot_msg.srv import RobotStateFbk, RobotStateFbkResponse
+from detection_msgs.msg import BoundingBox, BoundingBoxes
+from detection_msgs.srv import yolo, yoloResponse
 
 # obj detection
 import cv2
@@ -40,14 +43,11 @@ from utils.plots import Annotator, colors
 from utils.torch_utils import select_device
 from utils.augmentations import letterbox
 
-from detection_msgs.msg import BoundingBox, BoundingBoxes
 
 class Detection:
     def __init__(self):
-        # self.weights_path = rospy.get_param('~weights_path')
-        # self.model = torch.hub.load("ultralytics/yolov5","custom", path=self.weights_path)
+        '''YOLOv5'''
         self.br = CvBridge()
-
         self.conf_thres = rospy.get_param("~confidence_threshold")
         self.iou_thres = rospy.get_param("~iou_threshold")
         self.agnostic_nms = rospy.get_param("~agnostic_nms")
@@ -55,7 +55,6 @@ class Detection:
         self.classes = rospy.get_param("~classes", None)
         self.line_thickness = rospy.get_param("~line_thickness")
         self.view_image = rospy.get_param("~view_image")
-        # Initialize weights 
         weights = rospy.get_param("~weights")
         self.start_image = False
         # Initialize model
@@ -85,104 +84,244 @@ class Detection:
         cudnn.benchmark = True  # set True to speed up constant image size inference
         self.model.warmup(imgsz=(1 if self.pt else bs, 3, *self.img_size), half=self.half)  # warmup   
 
-        self.end_effector_z = 10
-        self.target_z = 4
 
-        self.start_image = False
+        '''Subscribers'''
+        rospy.Subscriber('/garbage_quick_sort/camera/image', Image, self.image_callback) # Get image
+        rospy.Subscriber('/garbage_quick_sort/global_state', RobotState, self.global_state_callback) # Check global state: looking for 2: GetPickUpLoc
+        self.global_state = 2 ################################## for testing
 
-        rospy.Subscriber('/zedm/zed_node/left/image_rect_color', Image, self.image_callback)
-        rospy.Subscriber('/distance', Float32, self.distance_callback)
 
-        self.found_garbage = False
-        self.pub_target_pose = rospy.Publisher('/garbage_quick_sort/end_effector_pose', EffectorPose, queue_size=10)
+        '''Service'''
+        # self.detection_service = rospy.Service('detection_service', yolo, self.return_target_xy) # request: z (absolute), response: x, y (camera frame) 
+        self.response_RobotStateFbk = rospy.Service('/garbage_quick_sort/response_RobotStateFbk', RobotStateFbk, self.state_feedback) # 1: in progress, 2: not found, 3: found
+        rospy.loginfo("Service started")
+
+
+        '''Client'''
+        rospy.wait_for_service('/garbage_quick_sort/z_service')
+        z_client = rospy.ServiceProxy('/garbage_quick_sort/z_service', zFbk) 
+
+
+        '''Publisher'''
+        self.pub_target_pose = rospy.Publisher('/garbage_quick_sort/camera_frame/end_effector_pose', EffectorPose, queue_size=10) # end_effecter_pose camera frame
         self.end_effector_pose_msg = EffectorPose()
 
-        self.start_service = rospy.Service('detection_service', yolo, self.return_target_xy)
 
+        '''Color Detection'''
         self.boundaries = { # hsv color boundaries
             'red' : np.array([[0,120,5], [5,255,255], [161, 125, 5], [179, 255, 255]]),  # plastic
-            'blue' : np.array([[98, 109, 2], [116, 255, 255]]),   # paper
+            'blue' : np.array([[98, 109, 2], [116, 255, 255]]), # paper
             'orange' : np.array([[20,90,20],[30,255,255], [6,100,150],[14,255,255]])  # cans
 
         }
-
         self.bgr_colors = {'red':(0,0,255), 'blue':(255,0,0), 'orange':(0,140,255)}
 
+
+        '''Box Contour Detection'''
         self.obj_center = [0,0]
         self.box_xywh = [0,0,0,0]
         self.box_center = [0,0]
+        self.found_garbage = False
+
+
+        '''Motion Detection'''
+        self.static_back = None
+        self.prev_gray = None
+        self.static_count = 0
+
+
+    def global_state_callback(self, msg):
+        self.global_state = msg.robot_state
 
 
     def image_callback(self, data):
         self.img_raw = data
         self.bgr_image = self.br.imgmsg_to_cv2(data,"bgr8")
+        self.gray_image = cv2.cvtColor(self.bgr_image, cv2.COLOR_BGR2GRAY)
         self.image_height, self.image_width, self.image_chanel = self.bgr_image.shape # (480,640,3)
         self.bgr_image = cv2.circle(self.bgr_image, [self.image_width//2, self.image_height//2], 2,(0,0,255),2)
         self.start_image = True
 
 
-    def distance_callback(self, msg):
-        self.target_z = msg.data
+    def state_feedback(self, request):
+        if request:
+            return RobotStateFbkResponse(self.active_status, self.goal_status)
+
 
 
     def inference(self):
-        im, im0 = self.preprocess(self.bgr_image)
-        im = torch.from_numpy(im).to(self.device) 
-        im = im.half() if self.half else im.float()
-        im /= 255
-        if len(im.shape) == 3:
-            im = im[None]
+        if self.start_image and self.global_state == 2: # GetPickUpLoc = 2
+            self.goal_status = 1 # in progress
+            self.active_status = True
 
-        results = self.model(im, augment=False, visualize=False)
-        results = non_max_suppression(
-            results, self.conf_thres, self.iou_thres, self.classes, self.agnostic_nms, max_det=self.max_det
-        )
-        det = results[0].cpu().numpy()
-        bounding_boxes = BoundingBoxes()
-        bounding_boxes.header = self.img_raw.header
-        bounding_boxes.image_header = self.img_raw.header
-        annotator = Annotator(self.bgr_image, line_width=self.line_thickness, example=str(self.names))
+            if self.is_moving():
+                return
+                
+            z = z_client()
+            # z = 0.2  # for testing
 
-        highest_conf = 0.0
-        if len(det):
-            self.found_garbage = True
-            # Rescale boxes from img_size to im0 size
-            det[:, :4] = scale_coords(im.shape[2:], det[:, :4], im0.shape).round()
+            im, im0 = self.preprocess(self.bgr_image)
+            im = torch.from_numpy(im).to(self.device) 
+            im = im.half() if self.half else im.float()
+            im /= 255
+            if len(im.shape) == 3:
+                im = im[None]
 
-            # Write results
-            for *xyxy, conf, cls in reversed(det):
-                bounding_box = BoundingBox()
-                c = int(cls)
-                # Fill in bounding box message
-                bounding_box.Class = self.names[c]
-                bounding_box.probability = conf 
-                bounding_box.xmin = int(xyxy[0])
-                bounding_box.ymin = int(xyxy[1])
-                bounding_box.xmax = int(xyxy[2])
-                bounding_box.ymax = int(xyxy[3])
+            results = self.model(im, augment=False, visualize=False)
+            results = non_max_suppression(
+                results, self.conf_thres, self.iou_thres, self.classes, self.agnostic_nms, max_det=self.max_det
+            )
+            det = results[0].cpu().numpy()
+            bounding_boxes = BoundingBoxes()
+            bounding_boxes.header = self.img_raw.header
+            bounding_boxes.image_header = self.img_raw.header
+            annotator = Annotator(self.bgr_image, line_width=self.line_thickness, example=str(self.names))
 
-                if conf > highest_conf:
-                    self.obj_center = ((bounding_box.xmin + bounding_box.xmax)//2,(bounding_box.ymin + bounding_box.ymax)//2)
+            highest_conf = 0.0
 
-                bounding_boxes.bounding_boxes.append(bounding_box)
+            if len(det): # found garbage
+                self.goal_status = 3 # found
+                # Rescale boxes from img_size to im0 size
+                det[:, :4] = scale_coords(im.shape[2:], det[:, :4], im0.shape).round()
 
-                # Annotate the image
-                if self.view_image:  # Add bbox to image
-                      # integer class
-                    label = f"{self.names[c]} {conf:.2f}"
-                    annotator.box_label(xyxy, label, color=colors(c, True))
+                # Write results
+                for *xyxy, conf, cls in reversed(det):
+                    bounding_box = BoundingBox()
+                    c = int(cls)
+                    # Fill in bounding box message
+                    bounding_box.Class = self.names[c]
+                    bounding_box.probability = conf 
+                    bounding_box.xmin = int(xyxy[0])
+                    bounding_box.ymin = int(xyxy[1])
+                    bounding_box.xmax = int(xyxy[2])
+                    bounding_box.ymax = int(xyxy[3])
 
-            self.bgr_image = cv2.circle(self.bgr_image, [self.obj_center[0], self.obj_center[1]], 2,(0,0,255),2)
-            # Stream results
-            im0 = annotator.result()
+                    bounding_box_area = (bounding_box.xmax - bounding_box.xmin) * (bounding_box.ymax - bounding_box.ymin)
+                    if (bounding_box.xmax - bounding_box.xmin) > 600 or (bounding_box.ymax - bounding_box.ymin) > 400:
+                        continue
+
+                    if conf > highest_conf:
+                        self.obj_center = ((bounding_box.xmin + bounding_box.xmax) // 2,(bounding_box.ymin + bounding_box.ymax) // 2) # look for target with highest conf value
+
+                    bounding_boxes.bounding_boxes.append(bounding_box)
+
+                    # Annotate the image
+                    if self.view_image:  # Add bbox to image
+                          # integer class
+                        label = f"{self.names[c]} {conf:.2f}"
+                        annotator.box_label(xyxy, label, color=colors(c, True))
+
+                self.bgr_image = cv2.circle(self.bgr_image, [self.obj_center[0], self.obj_center[1]], 2,(0,0,255),2) # show target center point
+                # Stream results
+                im0 = annotator.result()
+
+                x,y = self.pixel2xy(self.obj_center[0], self.obj_center[1], z) # calculate target x, y distance from camera center frame
+                self.publish_target_pose(x,y,z) # publish end effector pose
+
+            else:
+                self.goal_status = 2 # not found
+
+            cv2.imshow(str(0), self.bgr_image)
+            cv2.waitKey(1)
+        else:
+            self.goal_status = 0 # not detection state
+            self.active_status = False
+
+
+
+
+    def pixel2xy(self, pixel_x, pixel_y, z): # take center as origin, z in meter
+        z *= 100
+        x = z * tan(0.08 * (pixel_x - self.image_width / 2) * pi / 180)
+        y = z * tan(0.08 * (self.image_height / 2 - pixel_y) * pi / 180)
+
+        return x/100, y/100 #return in m
+
+
+    def publish_target_pose(self,x,y,z,phi=-90*pi/180):
+        self.end_effector_pose_msg.x = x # meter
+        self.end_effector_pose_msg.y = y # meter
+        self.end_effector_pose_msg.z = z # meter
+        self.end_effector_pose_msg.phi = phi # rad
+        
+        self.pub_target_pose.publish(self.end_effector_pose_msg)
+
+
+    def preprocess(self, img):
+        img0 = img.copy()
+        img = np.array([letterbox(img, self.img_size, stride=self.stride, auto=self.pt)[0]])
+        # Convert
+        img = img[..., ::-1].transpose((0, 3, 1, 2))  # BGR to RGB, BHWC to BCHW
+        img = np.ascontiguousarray(img)
+
+        return img, img0
+
+
+    def is_moving(self):
+        self.gray_image = cv2.GaussianBlur(self.gray_image, (21, 21), 0)
+
+        if self.static_back is None:
+            self.static_back = self.gray_image
+            self.prev_gray = self.gray_image
+            return
+        else:
+            self.static_back = self.prev_gray
+        self.prev_gray = self.gray_image
+    
+        diff_frame = cv2.absdiff(self.static_back, self.gray_image)
+        thresh_frame = cv2.threshold(diff_frame, 30, 255, cv2.THRESH_BINARY)[1]
+        thresh_frame = cv2.dilate(thresh_frame, None, iterations = 2)
+
+        # print(np.sum(thresh_frame, dtype=np.int32))
+        if np.sum(thresh_frame, dtype=np.int32) > 2000: # moving
+            self.static_count = 0
+
+        else:# static
+            self.static_count += 1
+
+        if self.static_count > 10:
+            return False
 
         else:
-            self.found_garbage = False
-
-        cv2.imshow(str(0), self.bgr_image)
-        cv2.waitKey(1)  # 1 millisecond
+            return True
 
 
+######################################################################## Not using ###################################################################################
+'''
+    def box_contour(self):
+        self.box_xywh = [0,0,0,0]
+        grayImage=cv2.cvtColor(self.bgr_image, cv2.COLOR_BGR2GRAY)
+        estimatedThreshold, thresholdImage=cv2.threshold(grayImage,125,255,cv2.THRESH_BINARY)
+        contours, hierarchy = cv2.findContours(thresholdImage,cv2.RETR_CCOMP,cv2.CHAIN_APPROX_SIMPLE)
+
+        for i, c in enumerate(contours):
+            x,y,w,h = cv2.boundingRect(c)
+
+            if w >= self.image_width - 50 or h >= self.image_height - 50:
+                continue
+
+            if w*h > self.box_xywh[2] * self.box_xywh[3]:
+                self.box_xywh = [x,y,w,h]
+
+        cv2.rectangle(self.bgr_image,(self.box_xywh[0],self.box_xywh[1]),(self.box_xywh[0] + self.box_xywh[2],self.box_xywh[1] + self.box_xywh[3]),(200,0,0),2)
+        self.box_center = [(self.box_xywh[0] + self.box_xywh[2]) // 2, (self.box_xywh[1] + self.box_xywh[3]) // 2]
+
+
+    def ratio_calculate(self):
+        try:
+            x_ratio = (self.obj_center[0] - self.box_xywh[0]) / self.box_xywh[2]
+            y_ratio = (self.obj_center[1] - self.box_xywh[1]) / self.box_xywh[3]
+
+            if self.obj_center[0] < self.box_center[0]:
+                x_ratio *= -1
+
+            if self.obj_center[1] > self.box_center[1]:
+                y_ratio *= -1
+
+            return x_ratio, y_ratio
+
+        except ZeroDivisionError:
+            return 0,0
 
 
     def color_detect(self):
@@ -223,15 +362,6 @@ class Detection:
         #     self.pixel2xy(x,y,self.distance)
         # except UnboundLocalError:
         #     pass
-            
-            
-
-    def pixel2xy(self, pixel_x, pixel_y, z): # take center as origin, all units in cm
-        x = z * tan(0.08 * (pixel_x - self.image_width / 2) * pi / 180)
-        y = z * tan(0.08 * (self.image_height / 2 - pixel_y) * pi / 180)
-
-        return x/100, y/100 #return in m
-
 
 
     def return_target_xy(self, request): #get z(float),  return x,y float meter status(T/F) 
@@ -242,65 +372,10 @@ class Detection:
 
             else:
                 return yoloResponse(0, 0 ,False)
+'''
 
 
-
-    def box_contour(self):
-        self.box_xywh = [0,0,0,0]
-        grayImage=cv2.cvtColor(self.bgr_image, cv2.COLOR_BGR2GRAY)
-        estimatedThreshold, thresholdImage=cv2.threshold(grayImage,125,255,cv2.THRESH_BINARY)
-        contours, hierarchy = cv2.findContours(thresholdImage,cv2.RETR_CCOMP,cv2.CHAIN_APPROX_SIMPLE)
-
-        for i, c in enumerate(contours):
-            x,y,w,h = cv2.boundingRect(c)
-
-            if w >= self.image_width - 50 or h >= self.image_height - 50:
-                continue
-
-            if w*h > self.box_xywh[2] * self.box_xywh[3]:
-                self.box_xywh = [x,y,w,h]
-
-        cv2.rectangle(self.bgr_image,(self.box_xywh[0],self.box_xywh[1]),(self.box_xywh[0] + self.box_xywh[2],self.box_xywh[1] + self.box_xywh[3]),(200,0,0),2)
-        self.box_center = [(self.box_xywh[0] + self.box_xywh[2]) // 2, (self.box_xywh[1] + self.box_xywh[3]) // 2]
-        
-
-
-    def ratio_calculate(self):
-        try:
-            x_ratio = (self.obj_center[0] - self.box_xywh[0]) / self.box_xywh[2]
-            y_ratio = (self.obj_center[1] - self.box_xywh[1]) / self.box_xywh[3]
-
-            if self.obj_center[0] < self.box_center[0]:
-                x_ratio *= -1
-
-            if self.obj_center[1] > self.box_center[1]:
-                y_ratio *= -1
-
-            return x_ratio, y_ratio
-
-        except ZeroDivisionError:
-            return 0,0
-
-
-    def publish_target_pose(self,x,y,z,phi=-90*pi/180):
-
-        self.end_effector_pose_msg.x = x
-        self.end_effector_pose_msg.y = y
-        self.end_effector_pose_msg.z = z #meter
-        self.end_effector_pose_msg.phi = phi #rad
-        
-        self.pub_target_pose.publish(self.end_effector_pose_msg)
-
-
-
-    def preprocess(self, img):
-        img0 = img.copy()
-        img = np.array([letterbox(img, self.img_size, stride=self.stride, auto=self.pt)[0]])
-        # Convert
-        img = img[..., ::-1].transpose((0, 3, 1, 2))  # BGR to RGB, BHWC to BCHW
-        img = np.ascontiguousarray(img)
-
-        return img, img0
+######################################################################## Not using ###################################################################################
 
 
 
@@ -310,11 +385,8 @@ if __name__ == "__main__":
     rate = rospy.Rate(15)
     detection = Detection()
     try:
-        
         while not rospy.is_shutdown():
-            if detection.start_image:
-                detection.inference()
+            detection.inference() 
             rate.sleep()
-
     except (KeyboardInterrupt, StopIteration):
         pass
