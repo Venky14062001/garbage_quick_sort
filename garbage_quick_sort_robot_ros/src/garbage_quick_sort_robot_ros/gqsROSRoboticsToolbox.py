@@ -57,7 +57,7 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
         self.prev_pose = None
 
         self.joint_names = np.array(
-            ["joint_1", "joint_2", "joint_3", "joint_4"])
+            ["joint_1", "joint_2", "joint_3", "joint_4"])   
 
         # check if goal is commanded
         self.goal_commanded = False
