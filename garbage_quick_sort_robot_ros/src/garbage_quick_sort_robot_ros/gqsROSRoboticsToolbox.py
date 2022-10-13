@@ -8,7 +8,7 @@ import moveit_commander
 from moveit_msgs.msg import DisplayTrajectory
 
 from garbage_quick_sort_robot_msg.msg import EffectorPose, RobotState
-from garbage_quick_sort_robot_msg.srv import RobotStateFbk, RobotStateFbkResponse
+from garbage_quick_sort_robot_msg.srv import RobotStateFbk, RobotStateFbkResponse, zFbk, zFbkResponse, EndEffectorPose, EndEffectorPoseResponse
 from garbage_quick_sort_robot_ik.gqsIK import GarbageQuickSortRobotIK
 
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
@@ -53,13 +53,15 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
         self.joint_state_eff = None
 
         self.current_goal = None
+        # store incoming pose later to send fo z inference
+        self.prev_pose = None
 
         self.joint_names = np.array(
             ["joint_1", "joint_2", "joint_3", "joint_4"])
 
         # check if goal is commanded
         self.goal_commanded = False
-        self.goal_tolerance = np.array([0.1, 0.1, 0.1, 0.1])
+        self.goal_tolerance = np.array([0.08, 0.08, 0.08, 0.08])
         # 0 is no goal received, 1 is in progress, 2 is failure, 3 is success
         self.reached_goal = 0
         self.goal_receive_time = None
@@ -68,9 +70,7 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
         # an attempt to solve the constant offset
         # offset assumed to be proportional to torque experienced (COM calculated)
         # 11.0, 5.0, 4.0
-        self.home_offset = np.array([0.201986, 0.0872665, 0.0698132])
-        # COM ratios (assumed proportional to lengths IMPORTANT FIRST LINK MASS IS INCORRECT, NOT USED IN COM CALCULATION)
-        self.mass_ratio = np.array([1.0, 1.0, 0.85483870967]) # ratio of links, with max link as 1.0
+        self.home_offset = np.array([-0.1, 0.19, 0.05, 0.04])
 
         self.ik_soln_exists = False
         self.traj_success = False
@@ -120,6 +120,16 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
             "/garbage_quick_sort/go_robot_service", RobotStateFbk,
             self.go_robot_server_callback)
 
+        # setup server to respond to global z position
+        self.z_value_server = rospy.Service(
+            "/garbage_quick_sort/z_service", zFbk,
+            self.z_server_callback)
+
+        # setup server to respond to give previous commanded end effector pose
+        self.end_effector_pose_server = rospy.Service(
+            "/garbage_quick_sort/end_effector_pose_service", EndEffectorPose,
+            self.end_effector_pose_server_callback)
+
         print("GQS ROS Initialized!")
 
     # update the global state of robot
@@ -134,6 +144,23 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
             self.current_goal = None
             self.goal_receive_time = None
 
+    # server to respond to z value for inference
+    def z_server_callback(self, req):
+        res = zFbkResponse()
+        res.z_value = self.prev_pose[2]
+
+        return res
+
+    # server to respond to end effector pose to obtain transform matrix
+    def end_effector_pose_server_callback(self, req):
+        res = EndEffectorPoseResponse()
+        res.x = self.prev_pose[0]
+        res.y = self.prev_pose[1]
+        res.z = self.prev_pose[2]
+        res.phi = self.prev_pose[3]
+
+        return res
+
     # server to respond to feedback of goal
     def go_robot_server_callback(self, req):
         res = RobotStateFbkResponse()
@@ -141,28 +168,6 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
         res.goal_status = self.reached_goal
 
         return res
-
-    # this function calculates the offset required 
-    def calculate_offset(self, joint_angles_calc):
-        cosine_sum = np.cos(np.array([joint_angles_calc[1], joint_angles_calc[1] + joint_angles_calc[2], joint_angles_calc[1] + joint_angles_calc[2] + joint_angles_calc[3]]))
-        prod_mass_cosine_sum = np.multiply(self.mass_ratio, cosine_sum)
-
-        num_com_arr_1 = np.array([prod_mass_cosine_sum[0], prod_mass_cosine_sum[0] + prod_mass_cosine_sum[1], 
-                        prod_mass_cosine_sum[0] + prod_mass_cosine_sum[1] + prod_mass_cosine_sum[2]])
-        den_com_arr_1 = np.array([self.mass_ratio[0], self.mass_ratio[0] + self.mass_ratio[1], 
-                        self.mass_ratio[0] + self.mass_ratio[1] + self.mass_ratio[2]])
-
-        num_com_arr_2 = np.array([prod_mass_cosine_sum[1], prod_mass_cosine_sum[1] + prod_mass_cosine_sum[2]])
-        den_com_arr_2 = np.array([self.mass_ratio[1], self.mass_ratio[1] + self.mass_ratio[2]])
-
-        num_com_arr_3 = np.array([prod_mass_cosine_sum[2]])
-        den_com_arr_3 = np.array([self.mass_ratio[2]])
-
-        com_ratio = np.array([np.sum(num_com_arr_1) / np.sum(den_com_arr_1), np.sum(num_com_arr_2) / np.sum(den_com_arr_2), np.sum(num_com_arr_3) / np.sum(den_com_arr_3)])
-        offset_arr = np.multiply(com_ratio, self.home_offset)
-
-        offset_arr = np.append(0.0, offset_arr) # no offset added for joint 0
-        return offset_arr
 
     # update joint state (responsible for updating reached_goal if active)
     def joint_state_callback(self, current_state):
@@ -230,7 +235,7 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
         head = Header()
         head.stamp = rospy.Time.now() 
         traj_msg.header = head
-        traj_msg.joint_names = self.joint_names # self.joint_names[0:] self.joint_names
+        traj_msg.joint_names = self.joint_names 
 
         # create a time vector 
         time_vec = np.linspace(0, traj_time, round(self.time_steps_per_sec * traj_time))
@@ -265,6 +270,7 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
 
             else:
                 req_pose = np.array([pose.x, pose.y, pose.z, pose.phi])
+                self.prev_pose = req_pose
 
                 ik_joint_sol = self.iksolver.get_joint_soln(req_pose)
 
@@ -321,10 +327,10 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
                 # add offset to joint_goa;
                 sel_ik_joint_sol_off = copy.deepcopy(sel_ik_joint_sol)
 
-                sel_ik_joint_sol_off[0] = - sel_ik_joint_sol[0] #+ joint_offset[0]
-                sel_ik_joint_sol_off[1] = sel_ik_joint_sol[1] #+ joint_offset[1]
-                sel_ik_joint_sol_off[2] = sel_ik_joint_sol[2] #+ joint_offset[2]
-                sel_ik_joint_sol_off[3] = sel_ik_joint_sol[3] #+ joint_offset[3]
+                sel_ik_joint_sol_off[0] = - sel_ik_joint_sol[0] + self.home_offset[0]
+                sel_ik_joint_sol_off[1] = sel_ik_joint_sol[1] + self.home_offset[1]
+                sel_ik_joint_sol_off[2] = sel_ik_joint_sol[2] + self.home_offset[2]
+                sel_ik_joint_sol_off[3] = sel_ik_joint_sol[3] + self.home_offset[3]
 
                 sel_ik_joint_sol_off = np.array(sel_ik_joint_sol_off)
                 revise_plan = self.create_trajectory_msg(sel_ik_joint_sol_off)

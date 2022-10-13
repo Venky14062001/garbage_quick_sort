@@ -3,6 +3,7 @@
 '''This script is used to publish the global state of robot continuously and get feedback about other working nodes'''
 
 from garbage_quick_sort_robot_state_machine.gqsStateMachine import GarbageQuickSortRobotStateMachine
+import rospy
 
 if __name__ == '__main__':
     gqsSM = GarbageQuickSortRobotStateMachine()
