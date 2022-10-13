@@ -117,7 +117,7 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
 
         # setup server to provide pose feedback (queried for pose by other packages after a goal is successful)
         self.pose_robot_server = rospy.Service(
-            "/garbage_quick_sort/effector_pose_service", RobotStateFbk,
+            "/garbage_quick_sort/effector_pose_service", EffectorPoseFbk,
             self.effector_pose_server_callback)
 
         # setup server to respond to state machine
@@ -131,6 +131,7 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
     def global_state_callback(self, global_state):
         if (global_state.robot_state in self.active_global_states):
             self.active = True
+            
         else:
             self.active = False
             # reset goal status values
@@ -330,6 +331,8 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
                 self.goal_commanded = True
                 self.current_goal = sel_ik_joint_sol_off
                 self.goal_receive_time = rospy.Time.now()
+
+                self.robot_pose = pose
 
                 # also publish to RViz for visualization
                 self.move_group.go(wait=True)
