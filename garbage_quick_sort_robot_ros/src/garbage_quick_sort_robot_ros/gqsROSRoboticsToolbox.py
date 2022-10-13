@@ -8,7 +8,7 @@ import moveit_commander
 from moveit_msgs.msg import DisplayTrajectory
 
 from garbage_quick_sort_robot_msg.msg import EffectorPose, RobotState
-from garbage_quick_sort_robot_msg.srv import RobotStateFbk, RobotStateFbkResponse
+from garbage_quick_sort_robot_msg.srv import RobotStateFbk, RobotStateFbkResponse, EffectorPoseFbk, EffectorPoseFbkResponse
 from garbage_quick_sort_robot_ik.gqsIK import GarbageQuickSortRobotIK
 
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
@@ -56,6 +56,9 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
 
         self.joint_names = np.array(
             ["joint_1", "joint_2", "joint_3", "joint_4"])
+
+        # store the pose of the robot after every successful pose movement
+        self.robot_pose = None
 
         # check if goal is commanded
         self.goal_commanded = False
@@ -115,6 +118,11 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
             self.global_state_callback
         )
 
+        # setup server to provide pose feedback (queried for pose by other packages after a goal is successful)
+        self.pose_robot_server = rospy.Service(
+            "/garbage_quick_sort/effector_pose_service", RobotStateFbk,
+            self.effector_pose_server_callback)
+
         # setup server to respond to state machine
         self.go_robot_server = rospy.Service(
             "/garbage_quick_sort/go_robot_service", RobotStateFbk,
@@ -133,6 +141,13 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
             self.reached_goal = 0
             self.current_goal = None
             self.goal_receive_time = None
+
+    # server to respond to effector pose query
+    def effector_pose_server_callback(self, req):
+        res = EffectorPoseFbkResponse()
+        res.pose_value = self.robot_pose
+
+        return res
 
     # server to respond to feedback of goal
     def go_robot_server_callback(self, req):

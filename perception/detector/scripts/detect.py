@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # ros import
 import rospy
@@ -9,7 +9,7 @@ from cv_bridge import CvBridge, CvBridgeError
 
 # custom msg and srv
 from garbage_quick_sort_robot_msg.msg import EffectorPose, RobotState
-from garbage_quick_sort_robot_msg.srv import RobotStateFbk, RobotStateFbkResponse
+from garbage_quick_sort_robot_msg.srv import RobotStateFbk, RobotStateFbkResponse, EffectorPoseFbk, EffectorPoseFbkRequest
 from detection_msgs.msg import BoundingBox, BoundingBoxes
 from detection_msgs.srv import yolo, yoloResponse
 
@@ -42,7 +42,6 @@ from utils.general import (
 from utils.plots import Annotator, colors
 from utils.torch_utils import select_device
 from utils.augmentations import letterbox
-
 
 class Detection:
     def __init__(self):
@@ -84,28 +83,28 @@ class Detection:
         cudnn.benchmark = True  # set True to speed up constant image size inference
         self.model.warmup(imgsz=(1 if self.pt else bs, 3, *self.img_size), half=self.half)  # warmup   
 
+        self.global_state = None 
+        self.active_status = False
+        self.goal_status = 0
+        self.end_effector_target_pose = None
+
+        self.active_global_states = [4]
 
         '''Subscribers'''
         rospy.Subscriber('/garbage_quick_sort/camera/image', Image, self.image_callback) # Get image
         rospy.Subscriber('/garbage_quick_sort/global_state', RobotState, self.global_state_callback) # Check global state: looking for 2: GetPickUpLoc
-        self.global_state = 2 ################################## for testing
-
 
         '''Service'''
-        # self.detection_service = rospy.Service('detection_service', yolo, self.return_target_xy) # request: z (absolute), response: x, y (camera frame) 
-        self.response_RobotStateFbk = rospy.Service('/garbage_quick_sort/response_RobotStateFbk', RobotStateFbk, self.state_feedback) # 1: in progress, 2: not found, 3: found
+        self.detect_RobotStateFbk = rospy.Service('/garbage_quick_sort/detect_RobotStateFbk', RobotStateFbk, self.state_feedback) # 1: in progress, 2: not found, 3: found
+        self.target_pose_server = rospy.Service('/garbage_quick_sort/target_pose_service', EffectorPose, self.target_pose_callback) # end_effecter_pose camera frame
         rospy.loginfo("Service started")
 
-
         '''Client'''
-        rospy.wait_for_service('/garbage_quick_sort/z_service')
-        z_client = rospy.ServiceProxy('/garbage_quick_sort/z_service', zFbk) 
-
-
-        '''Publisher'''
-        self.pub_target_pose = rospy.Publisher('/garbage_quick_sort/camera_frame/end_effector_pose', EffectorPose, queue_size=10) # end_effecter_pose camera frame
-        self.end_effector_pose_msg = EffectorPose()
-
+        rospy.wait_for_service('/garbage_quick_sort/effector_pose_service')
+        try:
+            self.detect_pose_client = rospy.ServiceProxy("/garbage_quick_sort/effector_pose_service", EffectorPoseFbk)
+        except rospy.ServiceException as e:
+            print("Detect pose service object failed: ", e)
 
         '''Color Detection'''
         self.boundaries = { # hsv color boundaries
@@ -116,23 +115,23 @@ class Detection:
         }
         self.bgr_colors = {'red':(0,0,255), 'blue':(255,0,0), 'orange':(0,140,255)}
 
-
         '''Box Contour Detection'''
         self.obj_center = [0,0]
         self.box_xywh = [0,0,0,0]
         self.box_center = [0,0]
         self.found_garbage = False
 
-
         '''Motion Detection'''
         self.static_back = None
         self.prev_gray = None
         self.static_count = 0
 
-
     def global_state_callback(self, msg):
-        self.global_state = msg.robot_state
-
+        if msg.robot_state in self.active_global_states:
+            self.active_status = True
+        else:
+            self.active_status = False
+            self.goal_status = 0
 
     def image_callback(self, data):
         self.img_raw = data
@@ -142,23 +141,29 @@ class Detection:
         self.bgr_image = cv2.circle(self.bgr_image, [self.image_width//2, self.image_height//2], 2,(0,0,255),2)
         self.start_image = True
 
-
     def state_feedback(self, request):
-        if request:
-            return RobotStateFbkResponse(self.active_status, self.goal_status)
+        res = RobotStateFbkResponse()
+        res.active_status = self.active_status
+        res.goal_status = self.goal_status
 
-
+        return res
 
     def inference(self):
-        if self.start_image and self.global_state == 2: # GetPickUpLoc = 2
+        if self.start_image and self.active_status: 
             self.goal_status = 1 # in progress
-            self.active_status = True
 
             if self.is_moving():
                 return
                 
-            z = z_client()
-            # z = 0.2  # for testing
+            # get z value from server
+            req = EffectorPoseFbkRequest()
+            try:
+                detect_pose_fbk = self.detect_pose_client(req)
+            except rospy.ServiceException as e:
+                print("Service call detect pose failed: ", e)
+                return
+
+            z_value = detect_pose_fbk.z
 
             im, im0 = self.preprocess(self.bgr_image)
             im = torch.from_numpy(im).to(self.device) 
@@ -284,99 +289,6 @@ class Detection:
 
         else:
             return True
-
-
-######################################################################## Not using ###################################################################################
-'''
-    def box_contour(self):
-        self.box_xywh = [0,0,0,0]
-        grayImage=cv2.cvtColor(self.bgr_image, cv2.COLOR_BGR2GRAY)
-        estimatedThreshold, thresholdImage=cv2.threshold(grayImage,125,255,cv2.THRESH_BINARY)
-        contours, hierarchy = cv2.findContours(thresholdImage,cv2.RETR_CCOMP,cv2.CHAIN_APPROX_SIMPLE)
-
-        for i, c in enumerate(contours):
-            x,y,w,h = cv2.boundingRect(c)
-
-            if w >= self.image_width - 50 or h >= self.image_height - 50:
-                continue
-
-            if w*h > self.box_xywh[2] * self.box_xywh[3]:
-                self.box_xywh = [x,y,w,h]
-
-        cv2.rectangle(self.bgr_image,(self.box_xywh[0],self.box_xywh[1]),(self.box_xywh[0] + self.box_xywh[2],self.box_xywh[1] + self.box_xywh[3]),(200,0,0),2)
-        self.box_center = [(self.box_xywh[0] + self.box_xywh[2]) // 2, (self.box_xywh[1] + self.box_xywh[3]) // 2]
-
-
-    def ratio_calculate(self):
-        try:
-            x_ratio = (self.obj_center[0] - self.box_xywh[0]) / self.box_xywh[2]
-            y_ratio = (self.obj_center[1] - self.box_xywh[1]) / self.box_xywh[3]
-
-            if self.obj_center[0] < self.box_center[0]:
-                x_ratio *= -1
-
-            if self.obj_center[1] > self.box_center[1]:
-                y_ratio *= -1
-
-            return x_ratio, y_ratio
-
-        except ZeroDivisionError:
-            return 0,0
-
-
-    def color_detect(self):
-        blur = cv2.GaussianBlur(self.bgr_image, (11, 11), 0) # reduce noises, smoothing image
-        hsv = cv2.cvtColor(blur, cv2.COLOR_BGR2HSV) # convert BGR image to HSV image
-        center = [0,0]
-        for color, code in self.boundaries.items():
-            if color == 'red' or color == 'orange':
-                low1, high1, low2, high2 = code
-                mask1 = cv2.inRange(hsv, low1, high1)
-                mask2 = cv2.inRange(hsv, low2, high2)
-                mask = mask1 + mask2
-            else:
-                low, high = code
-                mask = cv2.inRange(hsv, low, high)
-
-            kernel = np.ones((10,10),np.uint8) # Unsigned(no negative value) int 8bits(0-255)
-            mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel) # remove false positives. remove pixels(noises) from image (outside detected shape)
-            mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel) # remove false negatives. inside detected shape
-
-            cnts,_ = cv2.findContours(mask, cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
-
-
-            for index, con in enumerate(cnts):
-                (x,y),radius = cv2.minEnclosingCircle(con)
-                if radius < 2: # ignore noises 
-                    pass
-                else:
-                    center = [int(x),int(y)]
-                    cv2.drawContours(self.bgr_image, cnts, -1, self.bgr_colors[color], 5)
-                    cv2.putText(self.bgr_image,color, center, cv2.FONT_HERSHEY_SIMPLEX, 0.6,self.bgr_colors[color],2)
-            break
-
-        self.obj_center = center
-
-        # try:
-        #     #print(self.pixel2xy(x,y,self.distance))
-        #     self.pixel2xy(x,y,self.distance)
-        # except UnboundLocalError:
-        #     pass
-
-
-    def return_target_xy(self, request): #get z(float),  return x,y float meter status(T/F) 
-        if request.z:
-            if self.found_garbage:
-                target_x, target_y = self.pixel2xy(self.obj_center[0],self.obj_center[1], request.z)
-                return yoloResponse(target_x, target_y ,True)
-
-            else:
-                return yoloResponse(0, 0 ,False)
-'''
-
-
-######################################################################## Not using ###################################################################################
-
 
 
 # Results
