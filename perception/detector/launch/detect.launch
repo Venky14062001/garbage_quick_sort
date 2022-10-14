@@ -25,7 +25,7 @@
     <arg name="camera_frame_end_effector_pose_topic"        default="/garbage_quick_sort/camera_frame/end_effector_pose"/>
 
     <!-- Node -->
-    <node name="detect" pkg="detector" type="detect.py" output="screen">
+    <node name="detect" pkg="detector" type="gqsMainDetect.py" output="screen">
         <param name="weights"              value="$(arg weights)"/>
         <param name="data"                  value="$(arg data)"/>
         <param name="confidence_threshold"  value="$(arg confidence_threshold)"/>

@@ -3,14 +3,13 @@ import cv2
 import rospy
 from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import Image
-from detection_msgs.msg import BoundingBox, BoundingBoxes
-from std_msgs.msg import Float32
 
 cap = cv2.VideoCapture(0)
-print(cap.isOpened())
+print("Camera Started: ",cap.isOpened(), "\n")
+
 bridge = CvBridge()
 
-def talker():
+def publish_image():
 	pub = rospy.Publisher('/garbage_quick_sort/camera/image', Image, queue_size = 10)
 	rospy.init_node('image', anonymous = False)
 	rate = rospy.Rate(100)
@@ -20,6 +19,7 @@ def talker():
 			break
 		msg = bridge.cv2_to_imgmsg(frame, "bgr8")
 		pub.publish(msg)
+		rospy.loginfo("Publishing Image")
 		if cv2.waitKey(10) & 0xFF == ord('q'):
 			break
 		if rospy.is_shutdown():
@@ -28,7 +28,7 @@ def talker():
 
 if __name__ == '__main__':
 	try:
-		talker()
+		publish_image()
 	except rospy.ROSInterruptException:
 		pass
 

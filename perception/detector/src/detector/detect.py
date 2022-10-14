@@ -11,7 +11,6 @@ from cv_bridge import CvBridge, CvBridgeError
 from garbage_quick_sort_robot_msg.msg import EffectorPose, RobotState
 from garbage_quick_sort_robot_msg.srv import RobotStateFbk, RobotStateFbkResponse, EffectorPoseFbk, EffectorPoseFbkRequest, EffectorPoseFbkResponse
 from detection_msgs.msg import BoundingBox, BoundingBoxes
-from detection_msgs.srv import yolo, yoloResponse
 
 # obj detection
 import cv2
@@ -21,15 +20,11 @@ import numpy as np
 from math import pi, tan
 print("Using CUDA: ",torch.cuda.is_available())
 
-from pathlib import Path
-import os
 import sys
-
-FILE = Path(__file__).resolve()
-ROOT = FILE.parents[0] / "yolov5"
-if str(ROOT) not in sys.path:
-    sys.path.append(str(ROOT))  # add ROOT to PATH
-ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative path
+from rospkg import RosPack
+package = RosPack()
+package_path = package.get_path('detector')
+sys.path.insert(0,(package_path+'/src/yolov5'))
 
 # import from yolov5 submodules
 from yolov5.models.common import DetectMultiBackend
@@ -175,6 +170,8 @@ class Detection:
 
             z_value = detect_pose_fbk.z
 
+            # z_value = 0.3 # for testing
+
             im, im0 = self.preprocess(self.bgr_image)
             im = torch.from_numpy(im).to(self.device) 
             im = im.half() if self.half else im.float()
@@ -211,7 +208,7 @@ class Detection:
                     bounding_box.ymax = int(xyxy[3])
 
                     bounding_box_area = (bounding_box.xmax - bounding_box.xmin) * (bounding_box.ymax - bounding_box.ymin)
-                    if (bounding_box.xmax - bounding_box.xmin) > 600 or (bounding_box.ymax - bounding_box.ymin) > 400:
+                    if (bounding_box.xmax - bounding_box.xmin) > 600 and (bounding_box.ymax - bounding_box.ymin) > 400:
                         continue
 
                     if conf > highest_conf:
@@ -251,8 +248,12 @@ class Detection:
         z *= 100
         x = z * tan(0.08 * (pixel_x - self.image_width / 2) * pi / 180)
         y = z * tan(0.08 * (self.image_height / 2 - pixel_y) * pi / 180)
+        
+        transformed_x = y
+        transformed_y = -x
 
-        return x/100, y/100 #return in m
+        return transformed_x/100, transformed_y/100 #return in m
+
 
     def preprocess(self, img):
         img0 = img.copy()
