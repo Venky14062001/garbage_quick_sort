@@ -15,6 +15,8 @@ class RobotStateEnum(enum.Enum):
     GoPickHome = 3
     GetPickUpLoc = 4
     GoPickUpLoc = 5
+    TransGoPickUpLocGoDropLoc = 6
+    GoDropLoc = 7
 class GarbageQuickSortRobotStateMachine:
     def __init__(self):
         rospy.init_node("GarbageQuickSortStateMachine", anonymous=True)
@@ -28,10 +30,16 @@ class GarbageQuickSortRobotStateMachine:
         self.home_pose.phi = 0.0
 
         self.pick_home_pose = EffectorPose()
-        self.pick_home_pose.x = 0.205
-        self.pick_home_pose.y = 0.02
-        self.pick_home_pose.z = 0.092
+        self.pick_home_pose.x = 0.19
+        self.pick_home_pose.y = 0.38
+        self.pick_home_pose.z = 0.2
         self.pick_home_pose.phi = -1.571
+
+        self.drop_home_pose = EffectorPose()
+        self.drop_home_pose.x = -0.31
+        self.drop_home_pose.y = 0.38
+        self.drop_home_pose.z = 0.2
+        self.drop_home_pose.phi = -1.571 
 
         # this stores the transformed camera target pose to be commanded to GQS Robot
         self.global_target_pose = EffectorPose()
@@ -211,8 +219,8 @@ class GarbageQuickSortRobotStateMachine:
                     if ((go_robot_fbk.active_status == True) and (go_robot_fbk.goal_status == 3)):
                         # reset global_target_pose to None
                         self.global_target_pose = None
-                        print("Completed GoPickUpLoc state! Moving to next state StayIdle")
-                        self.state = RobotStateEnum.StayIdle
+                        print("Completed GoPickUpLoc state! Moving to next state TransGoPickUpLocGoDropLoc")
+                        self.state = RobotStateEnum.TransGoPickUpLocGoDropLoc
                     elif ((go_robot_fbk.active_status == True) and (go_robot_fbk.goal_status == 2)):
                         print("GoPickUpLoc state failed! Aborting and reverting to StayIdle")
                         self.state = RobotStateEnum.StayIdle
@@ -224,6 +232,37 @@ class GarbageQuickSortRobotStateMachine:
                         pass
                     else:
                         print("GoPickUpLoc state node not activated!")
+                        pass
+
+                elif (self.state == RobotStateEnum.TransGoPickUpLocGoDropLoc):
+                    self.state = RobotStateEnum.GoDropLoc
+                    rospy.sleep(0.5)
+
+                elif (self.state == RobotStateEnum.GoDropLoc):
+                    req = RobotStateFbkRequest()
+                    try:
+                        go_robot_fbk = self.go_robot_client_obj(req)
+                    except rospy.ServiceException as e:
+                        print("Service call GoDropLoc failed: ", e)
+                        continue
+
+                    # examine response to see if task succeded, if yes, switch state, if no, abort and StayIdle
+                    if ((go_robot_fbk.active_status == True) and (go_robot_fbk.goal_status == 3)):
+                        # reset global_target_pose to None
+                        self.global_target_pose = None
+                        print("Completed GoDropLoc state! Moving to next state StayIdle")
+                        self.state = RobotStateEnum.StayIdle
+                    elif ((go_robot_fbk.active_status == True) and (go_robot_fbk.goal_status == 2)):
+                        print("GoDropLoc state failed! Aborting and reverting to StayIdle")
+                        self.state = RobotStateEnum.StayIdle
+                    elif ((go_robot_fbk.active_status == True) and (go_robot_fbk.goal_status == 1)):
+                        pass
+                    elif ((go_robot_fbk.active_status == True) and (go_robot_fbk.goal_status == 0)):
+                        # republish goal state
+                        self.pose_publisher.publish(self.drop_home_pose)
+                        pass
+                    else:
+                        print("GoDropLoc state node not activated!")
                         pass
 
                 # publish state 
