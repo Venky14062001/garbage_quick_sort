@@ -10,6 +10,7 @@
   <buildtool_depend>catkin</buildtool_depend>
   <depend>rospy</depend>
   <depend>garbage_quick_sort_robot_msg</depend>
+  <depend>python-numpy</depend>
   <export>
     <architecture_independent />
   </export>

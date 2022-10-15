@@ -15,15 +15,17 @@ find_package(catkin REQUIRED COMPONENTS
 
 catkin_python_setup()
 catkin_package(
-  CATKIN_DEPENDS cv_bridge image_transport roscpp rospy sensor_msgs std_msgs 
-)
-
-include_directories(
-  ${catkin_INCLUDE_DIRS}
+  CATKIN_DEPENDS cv_bridge image_transport 
+  roscpp 
+  rospy 
+  sensor_msgs 
+  std_msgs 
+  detection_msgs
+  garbage_quick_sort_robot_msg 
 )
 
 catkin_install_python(
-  PROGRAMS scripts/gqsMainDetect.py scripts/pub_image.py
+  PROGRAMS scripts/gqsMainDetect scripts/pub_image
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

@@ -16,5 +16,5 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_python_setup()
 catkin_package()
 
-catkin_install_python(PROGRAMS scripts/gqsMainMoveIt scripts/gqsMainRoboticsToolbox 
+catkin_install_python(PROGRAMS scripts/gqsMainRoboticsToolbox 
                       DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})

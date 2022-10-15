@@ -5,7 +5,7 @@ from catkin_pkg.python_setup import generate_distutils_setup
 setup_args = generate_distutils_setup(
     packages=['detector'],
     package_dir={'': 'src'},
-    install_requires=['cv2', 'torch', 'numpy', 'math', 'yolov5']
+    install_requires=[]
 )
 
 setup(**setup_args)

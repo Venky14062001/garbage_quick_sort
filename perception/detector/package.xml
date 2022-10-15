@@ -7,30 +7,18 @@
   <maintainer email="skew002@todo.todo">skew002</maintainer>
   <license>BSD</license>
   <buildtool_depend>catkin</buildtool_depend>
-  <build_depend>cv_bridge</build_depend>
-  <build_depend>image_transport</build_depend>
-  <build_depend>roscpp</build_depend>
-  <build_depend>rospy</build_depend>
-  <build_depend>sensor_msgs</build_depend>
-  <build_depend>std_msgs</build_depend>
-  <build_depend>detection_msgs</build_depend>
-  <build_depend>garbage_quick_sort_robot_msg</build_depend>
-  <build_export_depend>cv_bridge</build_export_depend>
-  <build_export_depend>image_transport</build_export_depend>
-  <build_export_depend>roscpp</build_export_depend>
-  <build_export_depend>rospy</build_export_depend>
-  <build_export_depend>sensor_msgs</build_export_depend>
-  <build_export_depend>std_msgs</build_export_depend>
-  <build_export_depend>detection_msgs</build_export_depend>
-  <build_export_depend>garbage_quick_sort_robot_msg</build_export_depend>
-  <exec_depend>cv_bridge</exec_depend>
-  <exec_depend>image_transport</exec_depend>
-  <exec_depend>roscpp</exec_depend>
-  <exec_depend>rospy</exec_depend>
-  <exec_depend>sensor_msgs</exec_depend>
-  <exec_depend>std_msgs</exec_depend>
-  <exec_depend>detection_msgs</exec_depend>
-  <exec_depend>garbage_quick_sort_robot_msg</exec_depend>
+  <depend>cv_bridge</depend>
+  <depend>image_transport</depend>
+  <depend>roscpp</depend>
+  <depend>rospy</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>detection_msgs</depend>
+  <depend>garbage_quick_sort_robot_msg</depend>
+  <depend>python-numpy</depend>
+  <depend>python3-yolov5</depend>
+  <depend>python3-opencv</depend>
+  <depend>python-pytorch-pip</depend>
   <export>
     <architecture_independent />
   </export>

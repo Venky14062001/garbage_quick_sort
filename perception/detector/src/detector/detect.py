@@ -20,12 +20,6 @@ import numpy as np
 from math import pi, tan
 print("Using CUDA: ",torch.cuda.is_available())
 
-import sys
-from rospkg import RosPack
-package = RosPack()
-package_path = package.get_path('detector')
-sys.path.insert(0,(package_path+'/src/yolov5'))
-
 # import from yolov5 submodules
 from yolov5.models.common import DetectMultiBackend
 from yolov5.utils.general import (
@@ -78,7 +72,7 @@ class Detection:
         cudnn.benchmark = True  # set True to speed up constant image size inference
         self.model.warmup(imgsz=(1 if self.pt else bs, 3, *self.img_size), half=self.half)  # warmup   
 
-        self.global_state = None 
+        # state of robot variables
         self.active_status = False
         self.goal_status = 0
         self.end_effector_target_pose = None
@@ -87,7 +81,7 @@ class Detection:
 
         '''Subscribers'''
         rospy.Subscriber('/garbage_quick_sort/camera/image', Image, self.image_callback) # Get image
-        rospy.Subscriber('/garbage_quick_sort/global_state', RobotState, self.global_state_callback) # Check global state: looking for 2: GetPickUpLoc
+        rospy.Subscriber('/garbage_quick_sort/global_state', RobotState, self.global_state_callback) # Check global state: looking for 4: GetPickUpLoc
 
         '''Service'''
         self.detect_RobotStateFbk = rospy.Service('/garbage_quick_sort/detect_RobotStateFbk', RobotStateFbk, self.state_feedback) # 1: in progress, 2: not found, 3: found
@@ -130,12 +124,10 @@ class Detection:
 
     def target_pose_callback(self, req):
         res = EffectorPoseFbkResponse()
-        res = self.end_effector_target_pose 
+        # also need to fill in the type of garbage (IMP!), for now putting 0
+        res.type = 0
+        res.pose_value = self.end_effector_target_pose 
 
-        # here we change goal_status to 0, assuming that state machine has got the target_pose
-        # if state machine has not got pose, it will query the server again
-        # note: state machine queries only after it knows that inference has succeeded
-        self.goal_status = 0
         return res
 
     def image_callback(self, data):
@@ -154,7 +146,7 @@ class Detection:
         return res
 
     def inference(self):
-        if self.start_image and self.active_status: 
+        if ((self.start_image and self.active_status) and ((self.goal_status!=3) or (self.goal_status!=2))): 
             self.goal_status = 1 # in progress
 
             if self.is_moving():
@@ -168,7 +160,7 @@ class Detection:
                 print("Service call detect pose failed: ", e)
                 return
 
-            z_value = detect_pose_fbk.z
+            z_value = detect_pose_fbk.pose_value.z
 
             # z_value = 0.3 # for testing
 
@@ -232,7 +224,7 @@ class Detection:
                 self.end_effector_target_pose.x = x
                 self.end_effector_target_pose.y = y
                 self.end_effector_target_pose.z = z_value # give the same z_pose 
-                self.end_effector_target_pose.phi = -np.pi/2 # maybe software can later provide this also :P
+                self.end_effector_target_pose.phi = -np.pi/2 # maybe software can later provide this also :P , right now irrelevant because not used
 
                 self.goal_status = 3 # found
 
@@ -253,7 +245,6 @@ class Detection:
         transformed_y = -x
 
         return transformed_x/100, transformed_y/100 #return in m
-
 
     def preprocess(self, img):
         img0 = img.copy()

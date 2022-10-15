@@ -1,2 +1,3 @@
 ---
+int32 type # store the type of garbage, 0 for not relevant, assign rest numbers
 EffectorPose pose_value

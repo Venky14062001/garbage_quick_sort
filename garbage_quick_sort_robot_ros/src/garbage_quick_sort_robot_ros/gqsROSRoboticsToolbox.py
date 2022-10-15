@@ -81,9 +81,8 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
 
         # monitor if need to be activated
         self.active = False
-        # we know 0, 1, 3, 5, 7 are related to this class
         # added for test cases
-        self.active_global_states = [0, 1, 3, 5, 7, 11, 12, 13, 14, 18]  # [0, 1, 3, 5, 7]
+        self.active_global_states = [1, 3, 5]  
 
         # visualize trajectory in RViz
         self.display_trajectory_publisher = rospy.Publisher(
@@ -143,6 +142,8 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
     # server to respond to effector pose query
     def effector_pose_server_callback(self, req):
         res = EffectorPoseFbkResponse()
+        # send 0 from this node for type (not relevant), to be filled by higher packages
+        res.type = 0
         res.pose_value = self.robot_pose
 
         return res
@@ -159,7 +160,6 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
     def joint_state_callback(self, current_state):
         # ensure all joints are zeroed properly and the axis of rotation is correct
         self.joint_names = np.array(current_state.name)
-        # np.array([0.0] + list(current_state.position))
         self.joint_state_pos = np.array(current_state.position)
         self.joint_state_vel = np.array(current_state.velocity)
         self.joint_state_eff = np.array(current_state.effort)
@@ -175,6 +175,8 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
                         rospy.logerr(
                             "Goal timeout reached! Robot not reached goal state!")
                         self.reached_goal = 2
+                        # reupdate robot_pose to None if failed
+                        self.robot_pose = None
                     else:
                         # we can assume this state means goal is in progress (dont know if there is a better way?)
                         self.reached_goal = 1
@@ -184,6 +186,8 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
             # this state means goal is not received yet, so inform corresponding nodes to publish goal again
             else:
                 self.reached_goal = 0
+                # reupdate robot_pose to None if no goal yet
+                self.robot_pose = None
         else:
             pass
 
@@ -305,10 +309,10 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
                 self.move_group.set_joint_value_target(moveit_goal_joint_vals)
                 self.move_group.plan()
 
-                # add offset to joint_goa;
+                # add offset to joint_goal
                 sel_ik_joint_sol_off = copy.deepcopy(sel_ik_joint_sol)
 
-                sel_ik_joint_sol_off[0] = - sel_ik_joint_sol[0] + self.home_offset[0]
+                sel_ik_joint_sol_off[0] = - sel_ik_joint_sol[0] + self.home_offset[0] # the negative is to counter the gear change in direction
                 sel_ik_joint_sol_off[1] = sel_ik_joint_sol[1] + self.home_offset[1]
                 sel_ik_joint_sol_off[2] = sel_ik_joint_sol[2] + self.home_offset[2]
                 sel_ik_joint_sol_off[3] = sel_ik_joint_sol[3] + self.home_offset[3]

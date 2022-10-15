@@ -23,11 +23,7 @@ generate_messages(
 )
 
 catkin_package(
- CATKIN_DEPENDS std_msgs message_generation message_runtime
-)
-
-include_directories(
-  ${catkin_INCLUDE_DIRS}
+ CATKIN_DEPENDS std_msgs message_runtime
 )
 
 install(
