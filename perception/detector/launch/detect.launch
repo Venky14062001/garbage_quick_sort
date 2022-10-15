@@ -13,8 +13,8 @@
     <arg name="half"                  default="false"/>
     
     <!-- replace imgsz -->
-    <arg name="inference_size_h"      default="320"/>
-    <arg name="inference_size_w"      default="320"/>
+    <arg name="inference_size_h"      default="480"/>
+    <arg name="inference_size_w"      default="640"/>
     <arg name="view_image"            default="true"/>
 
     <!-- ros topics -->

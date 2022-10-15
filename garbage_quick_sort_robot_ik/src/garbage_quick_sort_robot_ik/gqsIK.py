@@ -6,7 +6,7 @@ import numpy as np
 class GarbageQuickSortRobotIK:
     def __init__(self):
         self.nDOF = 4
-        self.link_lengths = [0.131, 0.186, 0.186, 0.159]
+        self.link_lengths = [0.131, 0.186, 0.186, 0.135]
         # the z offset (z-location of joint 2)  
         self.zOffset = self.link_lengths[0]
 

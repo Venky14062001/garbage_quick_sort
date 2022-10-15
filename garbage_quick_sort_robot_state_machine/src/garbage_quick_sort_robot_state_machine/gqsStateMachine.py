@@ -15,12 +15,13 @@ class RobotStateEnum(enum.Enum):
     GoPickHome = 3
     GetPickUpLoc = 4
     GoPickUpLoc = 5
-    TransGoPickUpLocGoDropLoc = 6
-    GoDropLoc = 7
+    TransGoPickUpLocGoDropLoc1 = 6
+    GoDropLoc1 = 7
+    GoDropLoc2 = 8
 class GarbageQuickSortRobotStateMachine:
     def __init__(self):
         rospy.init_node("GarbageQuickSortStateMachine", anonymous=True)
-        self.state = RobotStateEnum.GoHome
+        self.state = RobotStateEnum.GoPickHome
 
         # define required poses here
         self.home_pose = EffectorPose()
@@ -30,16 +31,22 @@ class GarbageQuickSortRobotStateMachine:
         self.home_pose.phi = 0.0
 
         self.pick_home_pose = EffectorPose()
-        self.pick_home_pose.x = 0.19
-        self.pick_home_pose.y = 0.38
-        self.pick_home_pose.z = 0.2
+        self.pick_home_pose.x = -0.01
+        self.pick_home_pose.y = 0.15
+        self.pick_home_pose.z = 0.1
         self.pick_home_pose.phi = -1.571
 
-        self.drop_home_pose = EffectorPose()
-        self.drop_home_pose.x = -0.31
-        self.drop_home_pose.y = 0.38
-        self.drop_home_pose.z = 0.2
-        self.drop_home_pose.phi = -1.571 
+        self.drop1_home_pose = EffectorPose()
+        self.drop1_home_pose.x = 0.24
+        self.drop1_home_pose.y = 0.0
+        self.drop1_home_pose.z = 0.1
+        self.drop1_home_pose.phi = -1.571 
+
+        self.drop2_home_pose = EffectorPose()
+        self.drop2_home_pose.x = -0.26
+        self.drop2_home_pose.y = 0.0
+        self.drop2_home_pose.z = 0.1
+        self.drop2_home_pose.phi = -1.571 
 
         # this stores the transformed camera target pose to be commanded to GQS Robot
         self.global_target_pose = EffectorPose()
@@ -47,6 +54,13 @@ class GarbageQuickSortRobotStateMachine:
         self.global_target_pose.y = None
         self.global_target_pose.z = None
         self.global_target_pose.phi = None
+
+        # store the camera center location
+        self.camera_home_pose = EffectorPose()
+        self.camera_home_pose.x = 0.02
+        self.camera_home_pose.y = 0.38
+        self.camera_home_pose.z = 0.1
+        self.camera_home_pose.phi = -1.571 
 
         self.state_publisher =rospy.Publisher(
             "/garbage_quick_sort/global_state", 
@@ -79,13 +93,6 @@ class GarbageQuickSortRobotStateMachine:
             self.target_pose_client_obj = rospy.ServiceProxy("/garbage_quick_sort/target_pose_service", EffectorPoseFbk)
         except rospy.ServiceException as e:
             print("YOLO target pose service object failed: ", e)
-
-        # create client handler to get global pose of robot
-        rospy.wait_for_service("/garbage_quick_sort/effector_pose_service")
-        try:
-            self.global_pose_client_obj = rospy.ServiceProxy("/garbage_quick_sort/effector_pose_service", EffectorPoseFbk)
-        except rospy.ServiceException as e:
-            print("Go robot global pose service object failed: ", e)
 
         print("Garbage Quick Sort state machine activated :) !")
 
@@ -171,23 +178,12 @@ class GarbageQuickSortRobotStateMachine:
                             print("Service call target pose failed: ", e)
                             continue
 
-                        # get the current global pose to form transform matrix
-                        global_pose_req = EffectorPoseFbkRequest()
-                        try:
-                            global_pose_fbk = self.global_pose_client_obj(global_pose_req)
-                        except rospy.ServiceException as e:
-                            print("Service call global pose failed: ", e)
-                            continue
+                        target_pose_array = np.array([target_fbk.pose_value.x, target_fbk.pose_value.y, 0, 1])
+                        print(target_pose_array)
 
-                        # now use the (x, y) from target_fbk, transform to global state and store it
-                        transform_matrix = np.array([[np.cos(global_pose_fbk.pose_value.phi), -np.sin(global_pose_fbk.pose_value.phi), 0, global_pose_fbk.pose_value.x], 
-                                                        [np.sin(global_pose_fbk.pose_value.phi), np.cos(global_pose_fbk.pose_value.phi), 0, global_pose_fbk.pose_value.y],
-                                                        [0, 0, 1, global_pose_fbk.pose_value.z],
-                                                        [0, 0, 0, 1]])
+                        global_target = np.array([-target_pose_array[1] + self.camera_home_pose.x, target_pose_array[0] + self.camera_home_pose.y, 0.1, -1.571])
+                        print(global_target)
 
-                        target_pose_array = np.array([target_fbk.pose_value.x, target_fbk.pose_value.y, target_fbk.pose_value.z, 1])
-
-                        global_target = np.matmul(transform_matrix, target_pose_array)
                         self.global_target_pose.x = global_target[0]
                         self.global_target_pose.y = global_target[1]
                         self.global_target_pose.z = global_target[2]
@@ -220,7 +216,7 @@ class GarbageQuickSortRobotStateMachine:
                         # reset global_target_pose to None
                         self.global_target_pose = None
                         print("Completed GoPickUpLoc state! Moving to next state TransGoPickUpLocGoDropLoc")
-                        self.state = RobotStateEnum.TransGoPickUpLocGoDropLoc
+                        self.state = RobotStateEnum.TransGoPickUpLocGoDropLoc1
                     elif ((go_robot_fbk.active_status == True) and (go_robot_fbk.goal_status == 2)):
                         print("GoPickUpLoc state failed! Aborting and reverting to StayIdle")
                         self.state = RobotStateEnum.StayIdle
@@ -234,11 +230,11 @@ class GarbageQuickSortRobotStateMachine:
                         print("GoPickUpLoc state node not activated!")
                         pass
 
-                elif (self.state == RobotStateEnum.TransGoPickUpLocGoDropLoc):
-                    self.state = RobotStateEnum.GoDropLoc
-                    rospy.sleep(0.5)
+                elif (self.state == RobotStateEnum.TransGoPickUpLocGoDropLoc1):
+                    self.state = RobotStateEnum.GoDropLoc1
+                    print("Changing state to GoDropLoc1")
 
-                elif (self.state == RobotStateEnum.GoDropLoc):
+                elif (self.state == RobotStateEnum.GoDropLoc1):
                     req = RobotStateFbkRequest()
                     try:
                         go_robot_fbk = self.go_robot_client_obj(req)
@@ -259,7 +255,7 @@ class GarbageQuickSortRobotStateMachine:
                         pass
                     elif ((go_robot_fbk.active_status == True) and (go_robot_fbk.goal_status == 0)):
                         # republish goal state
-                        self.pose_publisher.publish(self.drop_home_pose)
+                        self.pose_publisher.publish(self.drop1_home_pose)
                         pass
                     else:
                         print("GoDropLoc state node not activated!")

@@ -70,7 +70,7 @@ class Detection:
             self.model.model.half() if self.half else self.model.model.float()
         bs = 1  # batch_size
         cudnn.benchmark = True  # set True to speed up constant image size inference
-        self.model.warmup(imgsz=(1 if self.pt else bs, 3, *self.img_size), half=self.half)  # warmup   
+        self.model.warmup(imgsz=(1 if self.pt else bs, 3, *self.img_size))  # warmup   
 
         # state of robot variables
         self.active_status = False
@@ -90,11 +90,11 @@ class Detection:
         rospy.loginfo("Service started")
 
         '''Client'''
-        rospy.wait_for_service('/garbage_quick_sort/effector_pose_service')
-        try:
-            self.detect_pose_client = rospy.ServiceProxy("/garbage_quick_sort/effector_pose_service", EffectorPoseFbk)
-        except rospy.ServiceException as e:
-            print("Detect pose service object failed: ", e)
+        # rospy.wait_for_service('/garbage_quick_sort/effector_pose_service')
+        # try:
+        #     self.detect_pose_client = rospy.ServiceProxy("/garbage_quick_sort/effector_pose_service", EffectorPoseFbk)
+        # except rospy.ServiceException as e:
+        #     print("Detect pose service object failed: ", e)
 
         '''Color Detection'''
         self.boundaries = { # hsv color boundaries
@@ -146,23 +146,24 @@ class Detection:
         return res
 
     def inference(self):
-        if ((self.start_image and self.active_status) and ((self.goal_status!=3) or (self.goal_status!=2))): 
-            self.goal_status = 1 # in progress
+        print(self.goal_status)
 
-            if self.is_moving():
-                return
+        if ((self.start_image )):#self.active_status) and ((self.goal_status!=3) or (self.goal_status!=2)
+
+            # if self.is_moving():
+            #     return
                 
             # get z value from server
-            req = EffectorPoseFbkRequest()
-            try:
-                detect_pose_fbk = self.detect_pose_client(req)
-            except rospy.ServiceException as e:
-                print("Service call detect pose failed: ", e)
-                return
+            # req = EffectorPoseFbkRequest()
+            # try:
+            #     detect_pose_fbk = self.detect_pose_client(req)
+            # except rospy.ServiceException as e:
+            #     print("Service call detect pose failed: ", e)
+            #     return
 
-            z_value = detect_pose_fbk.pose_value.z
+            # z_value = detect_pose_fbk.pose_value.z
 
-            # z_value = 0.3 # for testing
+            z_value = 0.495 # for testing
 
             im, im0 = self.preprocess(self.bgr_image)
             im = torch.from_numpy(im).to(self.device) 
@@ -200,12 +201,14 @@ class Detection:
                     bounding_box.ymax = int(xyxy[3])
 
                     bounding_box_area = (bounding_box.xmax - bounding_box.xmin) * (bounding_box.ymax - bounding_box.ymin)
-                    if (bounding_box.xmax - bounding_box.xmin) > 600 and (bounding_box.ymax - bounding_box.ymin) > 400:
+                    if (bounding_box.xmax - bounding_box.xmin) > (self.image_width - 100) or (bounding_box.ymax - bounding_box.ymin) > (self.image_height - 80):
+                        # print(bounding_box.xmax - bounding_box.xmin, bounding_box.ymax - bounding_box.ymin)
                         continue
 
                     if conf > highest_conf:
                         self.type_of_garbage = c + 1
                         self.obj_center = ((bounding_box.xmin + bounding_box.xmax) // 2,(bounding_box.ymin + bounding_box.ymax) // 2) # look for target with highest conf value
+                        self.goal_status = 3 
 
                     bounding_boxes.bounding_boxes.append(bounding_box)
 
@@ -215,6 +218,8 @@ class Detection:
                         label = f"{self.names[c]} {conf:.2f}"
                         annotator.box_label(xyxy, label, color=colors(c, True))
 
+                # if highest_conf > 0.0:
+                #     self.goal_status = 3 # found
                 self.bgr_image = cv2.circle(self.bgr_image, [self.obj_center[0], self.obj_center[1]], 2,(0,0,255),2) # show target center point
                 # Stream results
                 im0 = annotator.result()
@@ -227,15 +232,14 @@ class Detection:
                 self.end_effector_target_pose.z = z_value # give the same z_pose 
                 self.end_effector_target_pose.phi = -np.pi/2 # maybe software can later provide this also :P , right now irrelevant because not used
 
-                self.goal_status = 3 # found
 
-            else:
-                self.goal_status = 2 # not found
+            # else:
+            #     self.goal_status = 1 # not found/in progress
 
             cv2.imshow(str(0), self.bgr_image)
             cv2.waitKey(1)
-        else:
-            self.goal_status = 0 # not detection state
+        # else:
+        #     self.goal_status = 0 # not detection state
 
     def pixel2xy(self, pixel_x, pixel_y, z): # take center as origin, z in meter
         z *= 100
@@ -278,7 +282,7 @@ class Detection:
         else:# static
             self.static_count += 1
 
-        if self.static_count > 10:
+        if self.static_count > 5:
             return False
 
         else:

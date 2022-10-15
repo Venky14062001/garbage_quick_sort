@@ -28,17 +28,17 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
         self.iksolver = GarbageQuickSortRobotIK()
 
         # MoveIt! setup
-        moveit_commander.roscpp_initialize(sys.argv)
-        self.robot = moveit_commander.RobotCommander()
-        self.scene = moveit_commander.PlanningSceneInterface()
+        # moveit_commander.roscpp_initialize(sys.argv)
+        # self.robot = moveit_commander.RobotCommander()
+        # self.scene = moveit_commander.PlanningSceneInterface()
 
-        self.group_name = "garbage_quick_sort_robot_arm"
-        self.move_group = moveit_commander.MoveGroupCommander(self.group_name)
+        # self.group_name = "garbage_quick_sort_robot_arm"
+        # self.move_group = moveit_commander.MoveGroupCommander(self.group_name)
 
-        self.planning_frame = self.move_group.get_planning_frame()
-        self.eef_link = self.move_group.get_end_effector_link()
+        # self.planning_frame = self.move_group.get_planning_frame()
+        # self.eef_link = self.move_group.get_end_effector_link()
 
-        self.group_names = self.robot.get_group_names()
+        # self.group_names = self.robot.get_group_names()
 
         # dynamixel joint setup
         # store the joint limit values for the motor
@@ -62,7 +62,7 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
 
         # check if goal is commanded
         self.goal_commanded = False
-        self.goal_tolerance = np.array([0.08, 0.08, 0.08, 0.08])
+        self.goal_tolerance = np.array([0.12, 0.12, 0.12, 0.12])
         # 0 is no goal received, 1 is in progress, 2 is failure, 3 is success
         self.reached_goal = 0
         self.goal_receive_time = None
@@ -70,8 +70,8 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
 
         # an attempt to solve the constant offset
         # offset assumed to be proportional to torque experienced (COM calculated)
-        self.home_offset = np.array([-0.1, 0.19, 0.05, 0.04])
-
+        # self.home_offset = np.array([-0.18, 0.25, 0.20, 0.08]) # with pump exist
+        self.home_offset = np.array([-0.13, 0.16, 0.18, 0.00]) # without pump
         self.ik_soln_exists = False
         self.traj_success = False
 
@@ -82,7 +82,7 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
         # monitor if need to be activated
         self.active = False
         # added for test cases
-        self.active_global_states = [1, 3, 5]  
+        self.active_global_states = [1, 3, 5, 7]  
 
         # visualize trajectory in RViz
         self.display_trajectory_publisher = rospy.Publisher(
@@ -287,27 +287,27 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
                 self.iksolver.print_joint_deg(sel_ik_joint_sol)
 
                 # get robot current state, make MoveIt go to that state first then use toolbox to get traj and pass that traj to MoveIt!
-                moveit_start_joint_vals = self.move_group.get_current_joint_values()
-                moveit_start_joint_vals[0] = self.joint_state_pos[0]
-                moveit_start_joint_vals[1] = self.joint_state_pos[1]
-                moveit_start_joint_vals[2] = self.joint_state_pos[2]
-                moveit_start_joint_vals[3] = self.joint_state_pos[3]
+                # moveit_start_joint_vals = self.move_group.get_current_joint_values()
+                # moveit_start_joint_vals[0] = self.joint_state_pos[0]
+                # moveit_start_joint_vals[1] = self.joint_state_pos[1]
+                # moveit_start_joint_vals[2] = self.joint_state_pos[2]
+                # moveit_start_joint_vals[3] = self.joint_state_pos[3]
 
-                # get MoveIt! to actual motor state
-                self.move_group.go(moveit_start_joint_vals, wait=True)
-                self.move_group.stop()
-                rospy.sleep(1.0)
+                # # get MoveIt! to actual motor state
+                # self.move_group.go(moveit_start_joint_vals, wait=True)
+                # self.move_group.stop()
+                # rospy.sleep(1.0)
 
-                # get state again and plan to goal state
-                moveit_goal_joint_vals = self.move_group.get_current_joint_values()
-                moveit_goal_joint_vals[0] = sel_ik_joint_sol[0]
-                moveit_goal_joint_vals[1] = sel_ik_joint_sol[1]
-                moveit_goal_joint_vals[2] = sel_ik_joint_sol[2]
-                moveit_goal_joint_vals[3] = sel_ik_joint_sol[3]
+                # # get state again and plan to goal state
+                # moveit_goal_joint_vals = self.move_group.get_current_joint_values()
+                # moveit_goal_joint_vals[0] = sel_ik_joint_sol[0]
+                # moveit_goal_joint_vals[1] = sel_ik_joint_sol[1]
+                # moveit_goal_joint_vals[2] = sel_ik_joint_sol[2]
+                # moveit_goal_joint_vals[3] = sel_ik_joint_sol[3]
 
-                # when generating trajectory, try to change timestamps
-                self.move_group.set_joint_value_target(moveit_goal_joint_vals)
-                self.move_group.plan()
+                # # when generating trajectory, try to change timestamps
+                # self.move_group.set_joint_value_target(moveit_goal_joint_vals)
+                # self.move_group.plan()
 
                 # add offset to joint_goal
                 sel_ik_joint_sol_off = copy.deepcopy(sel_ik_joint_sol)
@@ -339,8 +339,8 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
                 self.robot_pose = pose
 
                 # also publish to RViz for visualization
-                self.move_group.go(wait=True)
-                self.move_group.stop()
+                # self.move_group.go(wait=True)
+                # self.move_group.stop()
 
         else:
             print("Joint goal received when not active! Ignoring request!")
