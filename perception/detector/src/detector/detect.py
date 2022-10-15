@@ -86,6 +86,7 @@ class Detection:
         '''Service'''
         self.detect_RobotStateFbk = rospy.Service('/garbage_quick_sort/detect_RobotStateFbk', RobotStateFbk, self.state_feedback) # 1: in progress, 2: not found, 3: found
         self.target_pose_server = rospy.Service('/garbage_quick_sort/target_pose_service', EffectorPoseFbk, self.target_pose_callback) # end_effecter_pose camera frame
+        self.type_of_garbage = 0
         rospy.loginfo("Service started")
 
         '''Client'''
@@ -124,8 +125,7 @@ class Detection:
 
     def target_pose_callback(self, req):
         res = EffectorPoseFbkResponse()
-        # also need to fill in the type of garbage (IMP!), for now putting 0
-        res.type = 0
+        res.type = self.type_of_garbage # 1: cardboard, 2: metal, 3: plastic
         res.pose_value = self.end_effector_target_pose 
 
         return res
@@ -204,6 +204,7 @@ class Detection:
                         continue
 
                     if conf > highest_conf:
+                        self.type_of_garbage = c + 1
                         self.obj_center = ((bounding_box.xmin + bounding_box.xmax) // 2,(bounding_box.ymin + bounding_box.ymax) // 2) # look for target with highest conf value
 
                     bounding_boxes.bounding_boxes.append(bounding_box)
