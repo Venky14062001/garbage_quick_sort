@@ -22,3 +22,6 @@
 [submodule "panda_moveit_config"]
 	path = panda_moveit_config
 	url = https://github.com/ros-planning/panda_moveit_config
+[submodule "rviz_visual_tools"]
+	path = rviz_visual_tools
+	url = https://github.com/PickNikRobotics/rviz_visual_tools
