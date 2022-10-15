@@ -1,0 +1,24 @@
+[submodule "moveit_msgs"]
+	path = moveit_msgs
+	url = https://github.com/ros-planning/moveit_msgs
+[submodule "moveit"]
+	path = moveit
+	url = https://github.com/ros-planning/moveit
+[submodule "moveit_resources"]
+	path = moveit_resources
+	url = https://github.com/ros-planning/moveit_resources
+[submodule "moveit_tutorials"]
+	path = moveit_tutorials
+	url = https://github.com/ros-planning/moveit_tutorials
+[submodule "moveit_visual_tools"]
+	path = moveit_visual_tools
+	url = https://github.com/ros-planning/moveit_visual_tools
+[submodule "geometric_shapes"]
+	path = geometric_shapes
+	url = https://github.com/ros-planning/geometric_shapes
+[submodule "srdfdom"]
+	path = srdfdom
+	url = https://github.com/ros-planning/srdfdom
+[submodule "panda_moveit_config"]
+	path = panda_moveit_config
+	url = https://github.com/ros-planning/panda_moveit_config
