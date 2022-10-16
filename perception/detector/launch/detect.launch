@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+    <!-- Camera topic and weights, config and classes files -->
+    <arg name="weights"	            default="$(find detector)/weights/3_class_garbage.pt"/>
+    <arg name="data"                  default="$(find detector)/scripts/yolov5/data/coco128.yaml"/>
+    <arg name="confidence_threshold"  default="0.75"/>
+    <arg name="iou_threshold"         default="0.45"/>
+    <arg name="maximum_detections"    default="1000"/>
+    <arg name="device"                default="0"/>
+    <arg name="agnostic_nms"          default="true"/>
+    <arg name="line_thickness"        default="3"/>
+    <arg name="dnn"                   default="true"/>
+    <arg name="half"                  default="false"/>
+    
+    <!-- replace imgsz -->
+    <arg name="inference_size_h"      default="320"/>
+    <arg name="inference_size_w"      default="320"/>
+    <arg name="view_image"            default="true"/>
+
+    <!-- ros topics -->
+    <arg name="image_topic"                                 default="/garbage_quick_sort/camera/image"/>
+    <arg name="global_robot_state_topic"                    default="/garbage_quick_sort/global_state"/>
+    <arg name="RobotStateFbk_service"                       default="/garbage_quick_sort/response_RobotStateFbk"/>
+    <arg name="z_service"                                   default="/garbage_quick_sort/z_service"/>
+    <arg name="camera_frame_end_effector_pose_topic"        default="/garbage_quick_sort/camera_frame/end_effector_pose"/>
+
+    <!-- Node -->
+    <node name="detect" pkg="detector" type="detect.py" output="screen">
+        <param name="weights"              value="$(arg weights)"/>
+        <param name="data"                  value="$(arg data)"/>
+        <param name="confidence_threshold"  value="$(arg confidence_threshold)"/>
+        <param name="iou_threshold"         value="$(arg iou_threshold)" />
+        <param name="maximum_detections"    value="$(arg maximum_detections)"/>
+        <param name="device"                value="$(arg device)" />
+        <param name="agnostic_nms"          value="$(arg agnostic_nms)" />
+        <param name="line_thickness"        value="$(arg line_thickness)"/>
+        <param name="dnn"                   value="$(arg dnn)"/>
+        <param name="half"                  value="$(arg half)"/>
+        <param name="inference_size_h"      value="$(arg inference_size_h)"/>
+        <param name="inference_size_w"      value="$(arg inference_size_w)"/>
+        <param name="view_image"            value="$(arg view_image)"/>
+    </node>
+
+
+    <!--include file="$(find zed_wrapper)/launch/zedm.launch">
+    </include-->
+</launch>
