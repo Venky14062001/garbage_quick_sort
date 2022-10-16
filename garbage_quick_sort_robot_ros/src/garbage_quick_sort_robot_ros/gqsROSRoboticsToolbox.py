@@ -43,9 +43,9 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
         # dynamixel joint setup
         # store the joint limit values for the motor
         self.dynamixel_joint_limit_lower = np.array(
-            [-np.pi, -np.pi, -np.pi, -np.pi])
+            [-1.5*np.pi, -1.5*np.pi, -1.5*np.pi, -1.5*np.pi])
         self.dynamixel_joint_limit_upper = np.array(
-            [np.pi, np.pi, np.pi, np.pi])
+            [1.5*np.pi, 1.5*np.pi, 1.5*np.pi, 1.5*np.pi])
 
         # store the current joint state of the robot (the position is with respect to global frame (with respect to previous joint))
         self.joint_state_pos = None
@@ -82,7 +82,7 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
         # monitor if need to be activated
         self.active = False
         # added for test cases
-        self.active_global_states = [1, 3, 5, 7]  
+        self.active_global_states = [1, 3, 5, 7, 8, 9]  
 
         # visualize trajectory in RViz
         self.display_trajectory_publisher = rospy.Publisher(
