@@ -25,3 +25,12 @@
 [submodule "rviz_visual_tools"]
 	path = rviz_visual_tools
 	url = https://github.com/PickNikRobotics/rviz_visual_tools
+[submodule "DynamixelSDK"]
+	path = DynamixelSDK
+	url = https://github.com/ROBOTIS-GIT/DynamixelSDK
+[submodule "dynamixel-workbench-msgs"]
+	path = dynamixel-workbench-msgs
+	url = https://github.com/ROBOTIS-GIT/dynamixel-workbench-msgs
+[submodule "dynamixel-workbench"]
+	path = dynamixel-workbench
+	url = https://github.com/ROBOTIS-GIT/dynamixel-workbench
