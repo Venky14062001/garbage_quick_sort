@@ -150,8 +150,8 @@ class Detection:
 
         if ((self.start_image )):#self.active_status) and ((self.goal_status!=3) or (self.goal_status!=2)
 
-            # if self.is_moving():
-            #     return
+            if self.is_moving():
+                return
                 
             # get z value from server
             # req = EffectorPoseFbkRequest()
@@ -218,8 +218,6 @@ class Detection:
                         label = f"{self.names[c]} {conf:.2f}"
                         annotator.box_label(xyxy, label, color=colors(c, True))
 
-                # if highest_conf > 0.0:
-                #     self.goal_status = 3 # found
                 self.bgr_image = cv2.circle(self.bgr_image, [self.obj_center[0], self.obj_center[1]], 2,(0,0,255),2) # show target center point
                 # Stream results
                 im0 = annotator.result()
@@ -233,8 +231,8 @@ class Detection:
                 self.end_effector_target_pose.phi = -np.pi/2 # maybe software can later provide this also :P , right now irrelevant because not used
 
 
-            # else:
-            #     self.goal_status = 1 # not found/in progress
+            else:
+                self.goal_status = 1 # not found/in progress
 
             cv2.imshow(str(0), self.bgr_image)
             cv2.waitKey(1)
@@ -287,3 +285,36 @@ class Detection:
 
         else:
             return True
+
+    def color_detect(self):
+        blur = cv2.GaussianBlur(self.bgr_image, (11, 11), 0) # reduce noises, smoothing image
+        hsv = cv2.cvtColor(blur, cv2.COLOR_BGR2HSV) # convert BGR image to HSV image
+        center = [0,0]
+        for color, code in self.boundaries.items():
+            if color == 'red' or color == 'orange':
+                low1, high1, low2, high2 = code
+                mask1 = cv2.inRange(hsv, low1, high1)
+                mask2 = cv2.inRange(hsv, low2, high2)
+                mask = mask1 + mask2
+            else:
+                low, high = code
+                mask = cv2.inRange(hsv, low, high)
+            kernel = np.ones((10,10),np.uint8) # Unsigned(no negative value) int 8bits(0-255)
+            mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel) # remove false positives. remove pixels(noises) from image (outside detected shape)
+            mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel) # remove false negatives. inside detected shape
+            cnts,_ = cv2.findContours(mask, cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+            for index, con in enumerate(cnts):
+                (x,y),radius = cv2.minEnclosingCircle(con)
+                if radius < 2: # ignore noises 
+                    pass
+                else:
+                    center = [int(x),int(y)]
+                    cv2.drawContours(self.bgr_image, cnts, -1, self.bgr_colors[color], 5)
+                    cv2.putText(self.bgr_image,color, center, cv2.FONT_HERSHEY_SIMPLEX, 0.6,self.bgr_colors[color],2)
+            break
+        self.obj_center = center
+        # try:
+        #     #print(self.pixel2xy(x,y,self.distance))
+        #     self.pixel2xy(x,y,self.distance)
+        # except UnboundLocalError:
+        #     pass
