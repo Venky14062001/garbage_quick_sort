@@ -1,0 +1,36 @@
+[submodule "dynamixel-workbench"]
+	path = dynamixel-workbench
+	url = https://github.com/ROBOTIS-GIT/dynamixel-workbench.git
+[submodule "dynamixel-workbench-msgs"]
+	path = dynamixel-workbench-msgs
+	url = https://github.com/ROBOTIS-GIT/dynamixel-workbench-msgs.git
+[submodule "DynamixelSDK"]
+	path = DynamixelSDK
+	url = https://github.com/ROBOTIS-GIT/DynamixelSDK.git
+[submodule "geometric_shapes"]
+	path = geometric_shapes
+	url = https://github.com/ros-planning/geometric_shapes.git
+[submodule "moveit"]
+	path = moveit
+	url = https://github.com/ros-planning/moveit.git
+[submodule "moveit_msgs"]
+	path = moveit_msgs
+	url = https://github.com/ros-planning/moveit_msgs.git
+[submodule "moveit_tutorials"]
+	path = moveit_tutorials
+	url = https://github.com/ros-planning/moveit_tutorials.git
+[submodule "moveit_visual_tools"]
+	path = moveit_visual_tools
+	url = https://github.com/ros-planning/moveit_visual_tools.git
+[submodule "panda_moveit_config"]
+	path = panda_moveit_config
+	url = https://github.com/ros-planning/panda_moveit_config.git
+[submodule "moveit_resources"]
+	path = moveit_resources
+	url = https://github.com/ros-planning/moveit_resources.git
+[submodule "rviz_visual_tools"]
+	path = rviz_visual_tools
+	url = https://github.com/PickNikRobotics/rviz_visual_tools.git
+[submodule "srdfdom"]
+	path = srdfdom
+	url = https://github.com/ros-planning/srdfdom.git
