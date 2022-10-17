@@ -14,6 +14,7 @@ from garbage_quick_sort_robot_ik.gqsIK import GarbageQuickSortRobotIK
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Header
+from std_msgs.msg import Bool
 
 from roboticstoolbox import jtraj
 import copy
@@ -82,7 +83,14 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
         # monitor if need to be activated
         self.active = False
         # added for test cases
-        self.active_global_states = [1, 3, 5, 7, 8, 9]  
+        self.active_global_states = [1, 3, 4, 6, 7, 8]  
+
+        # state number 6, start move down is a special state 
+        self.special_state = 4
+        self.global_state = None
+
+        # store the suction state
+        self.suction_state = False
 
         # visualize trajectory in RViz
         self.display_trajectory_publisher = rospy.Publisher(
@@ -100,6 +108,12 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
         self.joint_state_subscriber = rospy.Subscriber(
             "/dynamixel_workbench/joint_states", JointState,
             self.joint_state_callback
+        )
+
+        # subscribe to the suction state (IMPORTANT to return state succeded as soon as the suction is activated)
+        self.suction_state_subscriber = rospy.Subscriber(
+            "/garbage_quick_sort/arduino/suction_active", Bool,
+            self.suction_state_callback
         )
 
         # create the required subscriber to get the commanded end effector pose from higher packages
@@ -130,6 +144,7 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
     def global_state_callback(self, global_state):
         if (global_state.robot_state in self.active_global_states):
             self.active = True
+            self.global_state = global_state.robot_state
             
         else:
             self.active = False
@@ -138,6 +153,10 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
             self.reached_goal = 0
             self.current_goal = None
             self.goal_receive_time = None
+
+    # update the suction state 
+    def suction_state_callback(self, suction_msg):
+        self.suction_state = suction_msg.data
 
     # server to respond to effector pose query
     def effector_pose_server_callback(self, req):
@@ -167,7 +186,25 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
         if self.active:
             # if goal is commanded, check if it has reached within tolerance
             if self.goal_commanded:
-                if (self.ik_soln_exists and self.traj_success):
+                # first check if it special state, if yes, then keep checking force sensor readings, if force sensor detects something, then complete state
+                if (self.global_state == self.special_state):
+                    # if suction is activated, goal completed
+                    if self.suction_state:
+                        self.reached_goal = 3
+                        self.robot_pose = None
+                    elif np.all(np.less_equal(np.abs(self.joint_state_pos - self.current_goal), self.goal_tolerance)):
+                        self.reached_goal = 3
+                    # check if goal timeout
+                    elif (rospy.Time.now().secs - self.goal_receive_time.secs) > self.reach_goal_timeout:
+                        rospy.logerr(
+                            "Goal timeout reached! Robot not reached goal state!")
+                        self.reached_goal = 2
+                        # reupdate robot_pose to None if failed
+                        self.robot_pose = None
+                    else:
+                        # we can assume this state means goal is in progress (dont know if there is a better way?)
+                        self.reached_goal = 1
+                elif (self.ik_soln_exists and self.traj_success):
                     if np.all(np.less_equal(np.abs(self.joint_state_pos - self.current_goal), self.goal_tolerance)):
                         self.reached_goal = 3
                     # check if goal timeout

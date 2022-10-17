@@ -1,0 +1,16 @@
+# if not running rosdep
+sudo apt-get install ros-noetic-rosserial-arduino
+sudo apt-get install ros-noetic-rosserial
+
+# run this and make sure ros_lib is generated in sketchbook/libraries
+rosrun rosserial_arduino make_libraries.py
+
+# add this to generate our custom msgs from garbage_quick_sort_robot_msg
+rosrun rosserial_client make_library.py ~/sketchbook/libraries garbage_quick_sort_robot_msg
+
+# next compile and upload code to arduino
+
+# run this for arduino to forward to rest of ROS system
+rosrun rosserial_python serial_node.py /dev/ttyUSB0
+OR
+rosrun rosserial_arduino serial_node.py _port:=/dev/ttyUSB0
