@@ -27,17 +27,17 @@ class GarbageQuickSortRobotStateMachine:
 
         # define required poses here
         self.pick_home_pose = EffectorPose()
-        self.pick_home_pose.x = 0.15
-        self.pick_home_pose.y = 0.01
+        self.pick_home_pose.x = 0.125
+        self.pick_home_pose.y = 0.03
         self.pick_home_pose.z = 0.2
         self.pick_home_pose.phi = -1.571
 
         # 1: carboard, 2: metal, 3: plastic
 
         self.drop1_home_pose = EffectorPose()
-        self.drop1_home_pose.x = 0.0
-        self.drop1_home_pose.y = -0.24
-        self.drop1_home_pose.z = 0.1
+        self.drop1_home_pose.x = -0.025
+        self.drop1_home_pose.y = -0.22
+        self.drop1_home_pose.z = 0.2
         self.drop1_home_pose.phi = -1.571 
 
         self.drop2_home_pose = EffectorPose()
@@ -53,7 +53,7 @@ class GarbageQuickSortRobotStateMachine:
         self.drop3_home_pose.phi = -1.571 
 
         # this stores the target type
-        self.target_type = None
+        self.target_type = 1 #None
 
         # this stores the transformed camera target pose to be commanded to GQS Robot
         self.global_target_pose = EffectorPose()
@@ -131,7 +131,7 @@ class GarbageQuickSortRobotStateMachine:
                     # examine response to see if task succeded, if yes, switch state, if no, abort and StayIdle
                     if ((go_robot_fbk.active_status == True) and (go_robot_fbk.goal_status == 3)):
                         print("Completed GoPickHome state! Moving to next state GetPickUpLoc")
-                        self.state = RobotStateEnum.GetPickUpLoc
+                        self.state = RobotStateEnum.TransGoPickUpLocAgainGoDropLoc #RobotStateEnum.GetPickUpLoc
                     elif ((go_robot_fbk.active_status == True) and (go_robot_fbk.goal_status == 2)):
                         print("GoPickHome state failed! Aborting and reverting to StayIdle")
                         self.state = RobotStateEnum.StayIdle
