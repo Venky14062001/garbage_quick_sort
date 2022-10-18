@@ -1,2 +1,6 @@
 *.mp4
 __pycache__
+.rosinstall*
+.vscode
+Dockerfile 
+To Do
