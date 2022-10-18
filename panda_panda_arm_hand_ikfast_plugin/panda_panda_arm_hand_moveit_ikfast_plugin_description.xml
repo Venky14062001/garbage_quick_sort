@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<library path="lib/libpanda_panda_arm_hand_moveit_ikfast_plugin">
+  <class name="panda_panda_arm_hand/IKFastKinematicsPlugin" type="panda_panda_arm_hand::IKFastKinematicsPlugin" base_class_type="kinematics::KinematicsBase">
+    <description>IKFast61 plugin for closed-form kinematics of panda panda_arm_hand</description>
+  </class>
+</library>
