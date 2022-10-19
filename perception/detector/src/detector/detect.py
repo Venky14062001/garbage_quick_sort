@@ -78,7 +78,7 @@ class Detection:
         self.goal_status = 0
         self.end_effector_target_pose = None
 
-        self.active_global_states = [4]
+        self.active_global_states = [2]
 
         '''Subscribers'''
         rospy.Subscriber('/garbage_quick_sort/camera/image', Image, self.image_callback) # Get image
@@ -188,7 +188,7 @@ class Detection:
 
             # z_value = detect_pose_fbk.pose_value.z
 
-            z_value = 0.495 # for testing
+            z_value = 0.568 # for testing
 
             im, im0 = self.preprocess(self.bgr_image)
             im = torch.from_numpy(im).to(self.device) 
@@ -256,7 +256,7 @@ class Detection:
                 self.end_effector_target_pose.z = z_value # give the same z_pose 
                 self.end_effector_target_pose.phi = -np.pi/2 # maybe software can later provide this also :P , right now irrelevant because not used
 
-                self.frame_info_collection(bounding_boxes, z_value)
+                #self.frame_info_collection(bounding_boxes, z_value)
 
 
 

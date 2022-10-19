@@ -13,47 +13,48 @@ class RobotStateEnum(enum.Enum):
     GoPickHome = 1
     GetPickUpLoc = 2
     GoPickUpLoc = 3
-    StartMoveDown = 4 # this state force sensor activated, suction activated
-    TransStartMoveDownGoPickUpLocAgain = 5
-    GoPickUpLocAgain = 6
-    TransGoPickUpLocAgainGoDropLoc = 7
-    GoDropLoc1 = 8
-    GoDropLoc2 = 9
-    GoDropLoc3 = 10
+    TransGoPickUpLocStartMoveDown = 4
+    StartMoveDown = 5 # this state force sensor activated, suction activated
+    TransStartMoveDownGoPickUpLocAgain = 6
+    GoPickUpLocAgain = 7
+    TransGoPickUpLocAgainGoDropLoc = 8
+    GoDropLoc1 = 9
+    GoDropLoc2 = 10
+    GoDropLoc3 = 11
 class GarbageQuickSortRobotStateMachine:
     def __init__(self):
         rospy.init_node("GarbageQuickSortStateMachine", anonymous=True)
-        self.state = RobotStateEnum.GoPickHome
+        self.state = RobotStateEnum.GoPickHome #RobotStateEnum.GoPickHome
 
         # define required poses here
         self.pick_home_pose = EffectorPose()
         self.pick_home_pose.x = 0.125
         self.pick_home_pose.y = 0.03
-        self.pick_home_pose.z = 0.2
+        self.pick_home_pose.z = 0.15
         self.pick_home_pose.phi = -1.571
 
         # 1: carboard, 2: metal, 3: plastic
 
         self.drop1_home_pose = EffectorPose()
-        self.drop1_home_pose.x = -0.025
-        self.drop1_home_pose.y = -0.22
-        self.drop1_home_pose.z = 0.2
+        self.drop1_home_pose.x = 0.175
+        self.drop1_home_pose.y = 0.20
+        self.drop1_home_pose.z = 0.15
         self.drop1_home_pose.phi = -1.571 
 
         self.drop2_home_pose = EffectorPose()
-        self.drop2_home_pose.x = 0.0
-        self.drop2_home_pose.y = 0.26
-        self.drop2_home_pose.z = 0.1
+        self.drop2_home_pose.x = -0.025
+        self.drop2_home_pose.y = 0.20
+        self.drop2_home_pose.z = 0.15
         self.drop2_home_pose.phi = -1.571 
 
         self.drop3_home_pose = EffectorPose()
-        self.drop3_home_pose.x = 0.1
-        self.drop3_home_pose.y = 0.26
-        self.drop3_home_pose.z = 0.1
+        self.drop3_home_pose.x = 0.075
+        self.drop3_home_pose.y = 0.20
+        self.drop3_home_pose.z = 0.15
         self.drop3_home_pose.phi = -1.571 
 
         # this stores the target type
-        self.target_type = 1 #None
+        self.target_type = None
 
         # this stores the transformed camera target pose to be commanded to GQS Robot
         self.global_target_pose = EffectorPose()
@@ -71,9 +72,9 @@ class GarbageQuickSortRobotStateMachine:
 
         # store the camera center location
         self.camera_home_pose = EffectorPose()
-        self.camera_home_pose.x = 0.38
-        self.camera_home_pose.y = -0.02
-        self.camera_home_pose.z = 0.1
+        self.camera_home_pose.x = 0.405
+        self.camera_home_pose.y = 0.070
+        self.camera_home_pose.z = 0.15
         self.camera_home_pose.phi = -1.571 
 
         self.state_publisher =rospy.Publisher(
@@ -131,7 +132,7 @@ class GarbageQuickSortRobotStateMachine:
                     # examine response to see if task succeded, if yes, switch state, if no, abort and StayIdle
                     if ((go_robot_fbk.active_status == True) and (go_robot_fbk.goal_status == 3)):
                         print("Completed GoPickHome state! Moving to next state GetPickUpLoc")
-                        self.state = RobotStateEnum.TransGoPickUpLocAgainGoDropLoc #RobotStateEnum.GetPickUpLoc
+                        self.state = RobotStateEnum.GetPickUpLoc
                     elif ((go_robot_fbk.active_status == True) and (go_robot_fbk.goal_status == 2)):
                         print("GoPickHome state failed! Aborting and reverting to StayIdle")
                         self.state = RobotStateEnum.StayIdle
@@ -175,7 +176,7 @@ class GarbageQuickSortRobotStateMachine:
 
                         self.down_global_target_pose.x = global_target[0]
                         self.down_global_target_pose.y = global_target[1]
-                        self.down_global_target_pose.z = 0.02 # putting a very low target, need to test
+                        self.down_global_target_pose.z = 0.01 # putting a very low target, need to test
                         self.down_global_target_pose.phi = -1.571 
 
                         self.state = RobotStateEnum.GoPickUpLoc
@@ -203,7 +204,7 @@ class GarbageQuickSortRobotStateMachine:
                     # examine response to see if task succeded, if yes, switch state, if no, abort and StayIdle
                     if ((go_robot_fbk.active_status == True) and (go_robot_fbk.goal_status == 3)):
                         print("Completed GoPickUpLoc state! Moving to next state StartMoveDown")
-                        self.state = RobotStateEnum.StartMoveDown
+                        self.state = RobotStateEnum.TransGoPickUpLocStartMoveDown
                     elif ((go_robot_fbk.active_status == True) and (go_robot_fbk.goal_status == 2)):
                         print("GoPickUpLoc state failed! Aborting and reverting to StayIdle")
                         self.state = RobotStateEnum.StayIdle
@@ -216,6 +217,10 @@ class GarbageQuickSortRobotStateMachine:
                     else:
                         print("GoPickUpLoc state node not activated!")
                         pass
+
+                elif (self.state == RobotStateEnum.TransGoPickUpLocStartMoveDown):
+                    self.state = RobotStateEnum.StartMoveDown
+                    print("Changing state to StartMoveDown")
 
                 # the ToolBox node returns success if the suction is activated, then state changes
                 # other approach: use state machine to subscribe directly to suction status with the ToolBox node returning success from the start itself

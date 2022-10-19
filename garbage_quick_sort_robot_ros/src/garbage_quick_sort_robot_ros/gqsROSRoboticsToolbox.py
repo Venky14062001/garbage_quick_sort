@@ -72,7 +72,9 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
         # an attempt to solve the constant offset
         # offset assumed to be proportional to torque experienced (COM calculated)
         # self.home_offset = np.array([-0.18, 0.25, 0.20, 0.08]) # with pump exist
-        self.home_offset = np.array([-0.13, 0.16, 0.18, 0.00]) # without pump
+        # self.home_offset = np.array([-0.13, 0.16, 0.18, 0.00]) # without pump
+        self.home_offset = np.array([0.05, 0.21, 0.07, 0.00]) # without pump
+
         self.ik_soln_exists = False
         self.traj_success = False
 
@@ -83,10 +85,10 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
         # monitor if need to be activated
         self.active = False
         # added for test cases
-        self.active_global_states = [1, 3, 4, 6, 7, 8]  
+        self.active_global_states = [1, 3, 5, 7, 9, 10, 11]  
 
         # state number 6, start move down is a special state 
-        self.special_state = 4
+        self.special_state = 5
         self.global_state = None
 
         # store the suction state
@@ -187,24 +189,26 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
             # if goal is commanded, check if it has reached within tolerance
             if self.goal_commanded:
                 # first check if it special state, if yes, then keep checking force sensor readings, if force sensor detects something, then complete state
-                if (self.global_state == self.special_state):
-                    # if suction is activated, goal completed
-                    if self.suction_state:
-                        self.reached_goal = 3
-                        self.robot_pose = None
-                    elif np.all(np.less_equal(np.abs(self.joint_state_pos - self.current_goal), self.goal_tolerance)):
-                        self.reached_goal = 3
-                    # check if goal timeout
-                    elif (rospy.Time.now().secs - self.goal_receive_time.secs) > self.reach_goal_timeout:
-                        rospy.logerr(
-                            "Goal timeout reached! Robot not reached goal state!")
-                        self.reached_goal = 2
-                        # reupdate robot_pose to None if failed
-                        self.robot_pose = None
-                    else:
-                        # we can assume this state means goal is in progress (dont know if there is a better way?)
-                        self.reached_goal = 1
-                elif (self.ik_soln_exists and self.traj_success):
+                # if (self.global_state == self.special_state):
+                #     # if suction is activated, goal completed
+                #     if self.suction_state:
+                #         print(self.suction_state)
+                #         rospy.sleep(1.0)
+                #         self.reached_goal = 3
+                #         self.robot_pose = None
+                #     elif np.all(np.less_equal(np.abs(self.joint_state_pos - self.current_goal), self.goal_tolerance)):
+                #         self.reached_goal = 3
+                #     # check if goal timeout
+                #     elif (rospy.Time.now().secs - self.goal_receive_time.secs) > self.reach_goal_timeout:
+                #         rospy.logerr(
+                #             "Goal timeout reached! Robot not reached goal state!")
+                #         self.reached_goal = 2
+                #         # reupdate robot_pose to None if failed
+                #         self.robot_pose = None
+                #     else:
+                #         # we can assume this state means goal is in progress (dont know if there is a better way?)
+                #         self.reached_goal = 1
+                if (self.ik_soln_exists and self.traj_success):
                     if np.all(np.less_equal(np.abs(self.joint_state_pos - self.current_goal), self.goal_tolerance)):
                         self.reached_goal = 3
                     # check if goal timeout
@@ -349,7 +353,7 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
                 # add offset to joint_goal
                 sel_ik_joint_sol_off = copy.deepcopy(sel_ik_joint_sol)
 
-                sel_ik_joint_sol_off[0] = - sel_ik_joint_sol[0] + self.home_offset[0] # the negative is to counter the gear change in direction
+                sel_ik_joint_sol_off[0] = sel_ik_joint_sol[0] + self.home_offset[0] # the negative is to counter the gear change in direction
                 sel_ik_joint_sol_off[1] = sel_ik_joint_sol[1] + self.home_offset[1]
                 sel_ik_joint_sol_off[2] = sel_ik_joint_sol[2] + self.home_offset[2]
                 sel_ik_joint_sol_off[3] = sel_ik_joint_sol[3] + self.home_offset[3]

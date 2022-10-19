@@ -4,7 +4,7 @@ import rospy
 from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import Image
 
-cap = cv2.VideoCapture("garbage_3.mp4")
+cap = cv2.VideoCapture(0)
 print("Camera Started: ",cap.isOpened(), "\n")
 
 bridge = CvBridge()
@@ -19,7 +19,7 @@ def publish_image():
 		ret, frame = cap.read()
 		if not ret:
 			break
-		frame = cv2.flip(frame,-1) # 0: vertical flip, 1: horizontal flip, -1: both flip
+		# frame = cv2.flip(frame,-1) # 0: vertical flip, 1: horizontal flip, -1: both flip
 		msg = bridge.cv2_to_imgmsg(frame, "bgr8")
 		image.header.frame_id = "map"
 		image.header.stamp = rospy.Time.now()
