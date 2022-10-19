@@ -10,7 +10,8 @@ from cv_bridge import CvBridge, CvBridgeError
 # custom msg and srv
 from garbage_quick_sort_robot_msg.msg import EffectorPose, RobotState
 from garbage_quick_sort_robot_msg.srv import RobotStateFbk, RobotStateFbkResponse, EffectorPoseFbk, EffectorPoseFbkRequest, EffectorPoseFbkResponse
-from detection_msgs.msg import BoundingBox, BoundingBoxes
+from detection_msgs.msg import BoundingBox, BoundingBoxes, TargetCenter, TargetsInfoPerFrame, TargetsInfo
+from detection_msgs.srv import FramesInfo, FramesInfoResponse
 
 # obj detection
 import cv2
@@ -86,7 +87,16 @@ class Detection:
         '''Service'''
         self.detect_RobotStateFbk = rospy.Service('/garbage_quick_sort/detect_RobotStateFbk', RobotStateFbk, self.state_feedback) # 1: in progress, 2: not found, 3: found
         self.target_pose_server = rospy.Service('/garbage_quick_sort/target_pose_service', EffectorPoseFbk, self.target_pose_callback) # end_effecter_pose camera frame
+        self.frames_info_server = rospy.Service('/garbage_quick_sort/frame_info', FramesInfo, self.frames_info_callback) # end_effecter_pose camera frame
+
         self.type_of_garbage = 0
+        self.target_center = TargetCenter()
+        self.targets_info = TargetsInfo()
+        self.reached_target_frames_count = False
+        self.target_frame_count = 0
+        self.target_frame_limit = 50
+
+
         rospy.loginfo("Service started")
 
         '''Client'''
@@ -130,6 +140,21 @@ class Detection:
 
         return res
 
+    def frames_info_callback(self, req):
+        res = FramesInfoResponse()
+        if self.reached_target_frames_count and req:
+            res.success = True
+            res.frames_info = self.targets_info
+            self.target_frame_count = 0
+            self.reached_target_frames_count = False
+            return res
+        else:
+            res.frames_info = self.targets_info
+            res.success = False
+            return res
+
+        
+
     def image_callback(self, data):
         self.img_raw = data
         self.bgr_image = self.br.imgmsg_to_cv2(data,"bgr8")
@@ -146,12 +171,12 @@ class Detection:
         return res
 
     def inference(self):
-        print(self.goal_status)
+        # print(self.goal_status)
 
         if ((self.start_image )):#self.active_status) and ((self.goal_status!=3) or (self.goal_status!=2)
 
-            if self.is_moving():
-                return
+            # if self.is_moving():
+            #     return
                 
             # get z value from server
             # req = EffectorPoseFbkRequest()
@@ -200,7 +225,8 @@ class Detection:
                     bounding_box.xmax = int(xyxy[2])
                     bounding_box.ymax = int(xyxy[3])
 
-                    bounding_box_area = (bounding_box.xmax - bounding_box.xmin) * (bounding_box.ymax - bounding_box.ymin)
+                    # bounding_box_area = (bounding_box.xmax - bounding_box.xmin) * (bounding_box.ymax - bounding_box.ymin)
+
                     if (bounding_box.xmax - bounding_box.xmin) > (self.image_width - 100) or (bounding_box.ymax - bounding_box.ymin) > (self.image_height - 80):
                         # print(bounding_box.xmax - bounding_box.xmin, bounding_box.ymax - bounding_box.ymin)
                         continue
@@ -218,7 +244,7 @@ class Detection:
                         label = f"{self.names[c]} {conf:.2f}"
                         annotator.box_label(xyxy, label, color=colors(c, True))
 
-                self.bgr_image = cv2.circle(self.bgr_image, [self.obj_center[0], self.obj_center[1]], 2,(0,0,255),2) # show target center point
+                self.bgr_image = cv2.circle(self.bgr_image, [self.obj_center[0], self.obj_center[1]], 2,(0,255,0),2) # show target center point
                 # Stream results
                 im0 = annotator.result()
 
@@ -229,6 +255,9 @@ class Detection:
                 self.end_effector_target_pose.y = y
                 self.end_effector_target_pose.z = z_value # give the same z_pose 
                 self.end_effector_target_pose.phi = -np.pi/2 # maybe software can later provide this also :P , right now irrelevant because not used
+
+                self.frame_info_collection(bounding_boxes, z_value)
+
 
 
             else:
@@ -318,3 +347,39 @@ class Detection:
         #     self.pixel2xy(x,y,self.distance)
         # except UnboundLocalError:
         #     pass
+
+
+    def frame_info_collection(self, bounding_boxes, z_value):
+        print(self.target_frame_count)
+        self.targets_info_per_frame = TargetsInfoPerFrame()
+        if self.target_frame_count == 0:
+            self.targets_info.target_info.clear()
+
+        if self.target_frame_count >= self.target_frame_limit:
+            self.reached_target_frames_count = True
+
+        else:
+            self.target_frame_count += 1
+            for i, bounding_box in enumerate(bounding_boxes.bounding_boxes):
+                if bounding_box.Class == "CARDBOARD":
+                    object_class = 1
+
+                elif bounding_box.Class == "METAL":
+                    object_class = 2
+
+                elif bounding_box.Class == "PLASTIC":
+                    object_class = 3
+
+                pixel_x = (bounding_box.xmin + bounding_box.xmax) // 2
+                pixel_y = (bounding_box.ymin + bounding_box.ymax) // 2
+                x,y = self.pixel2xy(pixel_x, pixel_y, z_value)
+
+                self.target_center.object_class = object_class
+                self.target_center.x = x
+                self.target_center.y = y
+                self.target_center.conf = bounding_box.probability
+                self.targets_info_per_frame.target_info.append(self.target_center)
+
+            self.targets_info_per_frame.frame_count = self.target_frame_count
+
+            self.targets_info.target_info.append(self.targets_info_per_frame)

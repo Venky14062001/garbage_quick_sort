@@ -10,11 +10,14 @@ add_message_files(
   FILES
   BoundingBox.msg
   BoundingBoxes.msg
+  TargetCenter.msg
+  TargetsInfoPerFrame.msg
+  TargetsInfo.msg
 )
 
 add_service_files(
   FILES
-  yolo.srv
+  FramesInfo.srv
 )
 
 generate_messages(
