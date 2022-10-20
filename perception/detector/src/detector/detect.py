@@ -175,8 +175,8 @@ class Detection:
 
         if ((self.start_image )):#self.active_status) and ((self.goal_status!=3) or (self.goal_status!=2)
 
-            # if self.is_moving():
-            #     return
+            if self.is_moving():
+                return
                 
             # get z value from server
             # req = EffectorPoseFbkRequest()

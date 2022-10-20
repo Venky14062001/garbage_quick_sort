@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+
+<launch>
+    
+    <!-- Initiate communication with Arduino -->
+    <node name="serial_node"        pkg="rosserial_python"      type="serial_node.py">
+    <param name="port"              type="string"               value="/dev/ttyACM0"/>
+    <param name="baud"              type="int"                  value="57600"/>
+    </node>
+
+
+    <include file="$(find dynamixel_workbench_controllers)/launch/gqs_dynamixel_controllers.launch">
+    </include>
+
+    <include file="$(find detector)/launch/detect.launch">
+    </include>    
+
+
+
+    <!-- Helper nodes -->
+    <node type="gqsMainRoboticsToolbox" name="gqsMainRoboticsToolbox" pkg="garbage_quick_sort_robot_ros" args="-d $(find garbage_quick_sort_robot_ros)/scripts/gqsMainRoboticsToolbox"/>
+
+    <node type="pub_image" name="pub_image" pkg="detector" args="-d $(find detector)/scripts/pub_image"/>
+
+<!--     <node type="gqsMainStateMachine" name="gqsMainStateMachine" pkg="garbage_quick_sort_robot_state_machine" args="-d $(find garbage_quick_sort_robot_state_machine)/scripts/gqsMainStateMachine"/>
+ -->
+<!--     <node type="arduino_handler.py" name="arduino_handler" pkg="garbage_quick_sort_robot_arduino" args="-d $(find garbage_quick_sort_robot_arduino)/scripts/arduino_handler.py"/>
+ -->
+
+</launch>

@@ -18,6 +18,7 @@ from std_msgs.msg import Bool
 
 from roboticstoolbox import jtraj
 import copy
+import pandas as pd
 
 '''This class acts as a ROS Node to interface with Dynamixel Motors and MoveIt!, subscribes to joint state and publishes trajectory when joint goal is received'''
 
@@ -28,18 +29,21 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
         # robot IK solver
         self.iksolver = GarbageQuickSortRobotIK()
 
+        ##---------------------TEST##---------------------
+        self.i = 0
+
         # MoveIt! setup
-        # moveit_commander.roscpp_initialize(sys.argv)
-        # self.robot = moveit_commander.RobotCommander()
-        # self.scene = moveit_commander.PlanningSceneInterface()
+        moveit_commander.roscpp_initialize(sys.argv)
+        self.robot = moveit_commander.RobotCommander()
+        self.scene = moveit_commander.PlanningSceneInterface()
 
-        # self.group_name = "garbage_quick_sort_robot_arm"
-        # self.move_group = moveit_commander.MoveGroupCommander(self.group_name)
+        self.group_name = "garbage_quick_sort_robot_arm"
+        self.move_group = moveit_commander.MoveGroupCommander(self.group_name)
 
-        # self.planning_frame = self.move_group.get_planning_frame()
-        # self.eef_link = self.move_group.get_end_effector_link()
+        self.planning_frame = self.move_group.get_planning_frame()
+        self.eef_link = self.move_group.get_end_effector_link()
 
-        # self.group_names = self.robot.get_group_names()
+        self.group_names = self.robot.get_group_names()
 
         # dynamixel joint setup
         # store the joint limit values for the motor
@@ -79,7 +83,7 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
         self.traj_success = False
 
         # time to cover 1rad angle (based on max angle to cover)
-        self.time_per_rad = 1.5
+        self.time_per_rad = 0.8
         self.time_steps_per_sec = 5
 
         # monitor if need to be activated
@@ -189,26 +193,28 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
             # if goal is commanded, check if it has reached within tolerance
             if self.goal_commanded:
                 # first check if it special state, if yes, then keep checking force sensor readings, if force sensor detects something, then complete state
-                # if (self.global_state == self.special_state):
-                #     # if suction is activated, goal completed
-                #     if self.suction_state:
-                #         print(self.suction_state)
-                #         rospy.sleep(1.0)
-                #         self.reached_goal = 3
-                #         self.robot_pose = None
-                #     elif np.all(np.less_equal(np.abs(self.joint_state_pos - self.current_goal), self.goal_tolerance)):
-                #         self.reached_goal = 3
-                #     # check if goal timeout
-                #     elif (rospy.Time.now().secs - self.goal_receive_time.secs) > self.reach_goal_timeout:
-                #         rospy.logerr(
-                #             "Goal timeout reached! Robot not reached goal state!")
-                #         self.reached_goal = 2
-                #         # reupdate robot_pose to None if failed
-                #         self.robot_pose = None
-                #     else:
-                #         # we can assume this state means goal is in progress (dont know if there is a better way?)
-                #         self.reached_goal = 1
-                if (self.ik_soln_exists and self.traj_success):
+                if (self.global_state == self.special_state):
+                    # if suction is activated, goal completed
+                    if self.suction_state:
+                        # print(self.suction_state)
+                        rospy.sleep(0.5)
+                        self.reached_goal = 3
+                        self.robot_pose = None
+                    elif np.all(np.less_equal(np.abs(self.joint_state_pos - self.current_goal), self.goal_tolerance)):
+                        self.reached_goal = 3
+                    # check if goal timeout
+                    elif (rospy.Time.now().secs - self.goal_receive_time.secs) > self.reach_goal_timeout:
+                        rospy.logerr(
+                            "Goal timeout reached! Robot not reached goal state!")
+                        self.reached_goal = 2
+                        # reupdate robot_pose to None if failed
+                        self.robot_pose = None
+                    else:
+                        # we can assume this state means goal is in progress (dont know if there is a better way?)
+                        self.reached_goal = 1
+                elif (self.ik_soln_exists and self.traj_success):
+                    # print(self.current_goal)
+                    # print(self.joint_state_pos)
                     if np.all(np.less_equal(np.abs(self.joint_state_pos - self.current_goal), self.goal_tolerance)):
                         self.reached_goal = 3
                     # check if goal timeout
@@ -251,44 +257,54 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
         else:
             return 0
 
-    # this function creates the required trajectory message based on current state and goal
-    def create_trajectory_msg(self, joint_motor_frame):
-
-        # find the difference between joint states
-        diff_joint_states = np.abs(joint_motor_frame - self.joint_state_pos)
-        # find the max angle from the diff
-        max_joint_angle = np.max(diff_joint_states)
-
-        # find the time to go to the angle
-        traj_time = round(max_joint_angle * self.time_per_rad)
-
+    # this function creates the required trajectory message using moveit_plan 
+    def create_trajectory_msg(self, moveit_plan):
         traj_msg = JointTrajectory()
-        head = Header()
-        head.stamp = rospy.Time.now()
-        traj_msg.header = head
-        traj_msg.joint_names = self.joint_names
+        traj_msg.joint_names = self.joint_names 
 
-        # create a time vector
-        time_vec = np.linspace(0, traj_time, round(self.time_steps_per_sec * traj_time))
-
-        # use robotics toolbox to compute trajectory
-        try:
-            gen_traj = jtraj(self.joint_state_pos, joint_motor_frame, time_vec)
-        except:
-            return False, None
-
-        for i in range(len(gen_traj)):
-            tmp_traj_pt = JointTrajectoryPoint()
-
-            tmp_traj_pt.positions = gen_traj.s[i]
-            tmp_traj_pt.velocities = gen_traj.sd[i]
-            tmp_traj_pt.accelerations = gen_traj.sdd[i]
-
-            tmp_traj_pt.time_from_start = Duration(time_vec[i])
-
-            traj_msg.points.append(tmp_traj_pt)
+        traj_msg.header = moveit_plan[1].joint_trajectory.header
+        traj_msg.points = moveit_plan[1].joint_trajectory.points
 
         return True, traj_msg
+
+    # # this function creates the required trajectory message based on current state and goal
+    # def create_trajectory_msg(self, joint_motor_frame):
+
+    #     # find the difference between joint states
+    #     diff_joint_states = np.abs(joint_motor_frame - self.joint_state_pos)
+    #     # find the max angle from the diff
+    #     max_joint_angle = np.max(diff_joint_states)
+
+    #     # find the time to go to the angle
+    #     traj_time = round(max_joint_angle * self.time_per_rad)
+
+    #     traj_msg = JointTrajectory()
+    #     head = Header()
+    #     head.stamp = rospy.Time.now()
+    #     traj_msg.header = head
+    #     traj_msg.joint_names = self.joint_names
+
+    #     # create a time vector
+    #     time_vec = np.linspace(0, traj_time, round(self.time_steps_per_sec * traj_time))
+
+    #     # use robotics toolbox to compute trajectory
+    #     try:
+    #         gen_traj = jtraj(self.joint_state_pos, joint_motor_frame, time_vec)
+    #     except:
+    #         return False, None
+
+    #     for i in range(len(gen_traj)):
+    #         tmp_traj_pt = JointTrajectoryPoint()
+
+    #         tmp_traj_pt.positions = gen_traj.s[i]
+    #         tmp_traj_pt.velocities = gen_traj.sd[i]
+    #         tmp_traj_pt.accelerations = gen_traj.sdd[i]
+
+    #         tmp_traj_pt.time_from_start = Duration(time_vec[i])
+
+    #         traj_msg.points.append(tmp_traj_pt)
+
+    #     return True, traj_msg
 
     # if a new goal pose is received, calculate joint angles, update state and call the function to publish goal
     # responsible for updating goal_commanded
@@ -328,42 +344,112 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
                 self.iksolver.print_joint_deg(sel_ik_joint_sol)
 
                 # get robot current state, make MoveIt go to that state first then use toolbox to get traj and pass that traj to MoveIt!
-                # moveit_start_joint_vals = self.move_group.get_current_joint_values()
-                # moveit_start_joint_vals[0] = self.joint_state_pos[0]
-                # moveit_start_joint_vals[1] = self.joint_state_pos[1]
-                # moveit_start_joint_vals[2] = self.joint_state_pos[2]
-                # moveit_start_joint_vals[3] = self.joint_state_pos[3]
+                moveit_start_joint_vals = self.move_group.get_current_joint_values()
+                moveit_start_joint_vals[0] = self.joint_state_pos[0]
+                moveit_start_joint_vals[1] = self.joint_state_pos[1]
+                moveit_start_joint_vals[2] = self.joint_state_pos[2]
+                moveit_start_joint_vals[3] = self.joint_state_pos[3]
 
-                # # get MoveIt! to actual motor state
-                # self.move_group.go(moveit_start_joint_vals, wait=True)
-                # self.move_group.stop()
-                # rospy.sleep(1.0)
+                # get MoveIt! to actual motor state
+                self.move_group.go(moveit_start_joint_vals, wait=True)
+                self.move_group.stop()
+                rospy.sleep(1.0)
 
-                # # get state again and plan to goal state
-                # moveit_goal_joint_vals = self.move_group.get_current_joint_values()
-                # moveit_goal_joint_vals[0] = sel_ik_joint_sol[0]
-                # moveit_goal_joint_vals[1] = sel_ik_joint_sol[1]
-                # moveit_goal_joint_vals[2] = sel_ik_joint_sol[2]
-                # moveit_goal_joint_vals[3] = sel_ik_joint_sol[3]
+                # get state again and plan to goal state
+                moveit_goal_joint_vals = self.move_group.get_current_joint_values()
+                moveit_goal_joint_vals[0] = sel_ik_joint_sol[0] + self.home_offset[0]
+                moveit_goal_joint_vals[1] = sel_ik_joint_sol[1] + self.home_offset[1]
+                moveit_goal_joint_vals[2] = sel_ik_joint_sol[2] + self.home_offset[2]
+                moveit_goal_joint_vals[3] = sel_ik_joint_sol[3] + self.home_offset[3]
 
-                # # when generating trajectory, try to change timestamps
-                # self.move_group.set_joint_value_target(moveit_goal_joint_vals)
-                # self.move_group.plan()
+                sel_ik_joint_sol_off = copy.deepcopy(moveit_goal_joint_vals)
 
-                # add offset to joint_goal
-                sel_ik_joint_sol_off = copy.deepcopy(sel_ik_joint_sol)
+                # when generating trajectory, try to change timestamps
+                self.move_group.set_joint_value_target(moveit_goal_joint_vals)
+                plan = self.move_group.plan()
 
-                sel_ik_joint_sol_off[0] = sel_ik_joint_sol[0] + self.home_offset[0] # the negative is to counter the gear change in direction
-                sel_ik_joint_sol_off[1] = sel_ik_joint_sol[1] + self.home_offset[1]
-                sel_ik_joint_sol_off[2] = sel_ik_joint_sol[2] + self.home_offset[2]
-                sel_ik_joint_sol_off[3] = sel_ik_joint_sol[3] + self.home_offset[3]
+                # check if planning succeeded
+                if (plan[0]):
+                    self.moveit_traj_success = True
+                    revise_plan = self.create_trajectory_msg(plan)
+                else:
+                    print("MoveIt! unable to plan trajectory!")
+                    self.goal_commanded = True
+                    self.moveit_traj_success = False
+                    return 
 
-                sel_ik_joint_sol_off = np.array(sel_ik_joint_sol_off)
-                revise_plan = self.create_trajectory_msg(sel_ik_joint_sol_off)
+                # # add offset to joint_goal
+                # sel_ik_joint_sol_off = copy.deepcopy(sel_ik_joint_sol)
+
+                # sel_ik_joint_sol_off[0] = sel_ik_joint_sol[0] + self.home_offset[0] # the negative is to counter the gear change in direction
+                # sel_ik_joint_sol_off[1] = sel_ik_joint_sol[1] + self.home_offset[1]
+                # sel_ik_joint_sol_off[2] = sel_ik_joint_sol[2] + self.home_offset[2]
+                # sel_ik_joint_sol_off[3] = sel_ik_joint_sol[3] + self.home_offset[3]
+
+                # sel_ik_joint_sol_off = np.array(sel_ik_joint_sol_off)
+                # revise_plan = self.create_trajectory_msg(sel_ik_joint_sol_off)
 
                 # check if planning succeeded
                 if (revise_plan[0]):
                     self.traj_success = True
+
+                    # # --------------------  TEST  ------------------------------#
+                    # dict_traj = {}
+                    # pos_1_l = []
+                    # vel_1_l = []
+                    # acc_1_l = []
+                    # time_1_l = []
+                    # pos_2_l = []
+                    # vel_2_l = []
+                    # acc_2_l = []
+                    # time_2_l = []
+                    # pos_3_l = []
+                    # vel_3_l = []
+                    # acc_3_l = []
+                    # time_3_l = []
+                    # pos_4_l = []
+                    # vel_4_l = []
+                    # acc_4_l = []
+                    # time_4_l = []
+                    # pos_m_l = [pos_1_l, pos_2_l, pos_3_l, pos_4_l]
+                    # vel_m_l = [vel_1_l, vel_2_l, vel_3_l, vel_4_l]
+                    # acc_m_l = [acc_1_l, acc_2_l, acc_3_l, acc_4_l]
+                    # time_m_l = [time_1_l, time_2_l, time_3_l, time_4_l]
+                    
+                    # for j in range(len(revise_plan[1].points)):
+                    #     for k in range(4):
+                    #         pos_m_l[k].append(revise_plan[1].points[j].positions)
+                    #         vel_m_l[k].append(revise_plan[1].points[j].velocities)
+                    #         acc_m_l[k].append(revise_plan[1].points[j].accelerations)
+                    #         time_m_l[k].append(revise_plan[1].points[j].time_from_start)
+
+
+                    # dict_traj["pos1"]=pos_m_l[0]
+                    # dict_traj["vel1"]=vel_m_l[0]
+                    # dict_traj["acc1"]=acc_m_l[0]
+                    # dict_traj["time1"]=time_m_l[0]
+
+                    # dict_traj["pos2"]=pos_m_l[1]
+                    # dict_traj["vel2"]=vel_m_l[1]
+                    # dict_traj["acc2"]=acc_m_l[1]
+                    # dict_traj["time2"]=time_m_l[1]
+
+                    # dict_traj["pos3"]=pos_m_l[2]
+                    # dict_traj["vel3"]=vel_m_l[2]
+                    # dict_traj["acc3"]=acc_m_l[2]
+                    # dict_traj["time3"]=time_m_l[2]
+
+                    # dict_traj["pos4"]=pos_m_l[3]
+                    # dict_traj["vel4"]=vel_m_l[3]
+                    # dict_traj["acc4"]=acc_m_l[3]
+                    # dict_traj["time4"]=time_m_l[3]
+
+                    # df = pd.DataFrame(dict_traj)
+                    # df.to_csv("debug_traj_" + str(self.i) + "_.csv")
+                    # self.i+=1
+
+                # --------------------  TEST  ------------------------------#
+
                 else:
                     print("Toolbox unable to plan trajectory!")
                     self.goal_commanded = True

@@ -1,134 +1,89 @@
 #include <ros.h>
 #include <std_msgs/Bool.h>
 #include <std_msgs/Int16.h>
-#include <garbage_quick_sort_robot_msg/RobotState.h>
-
-// subscribe to robot global state, if correct state, then keep monitoring force sensor, as soon as force detected turn on suction and reset force sensor
-// suction remains turned on until state reaches drop location, then suction releases and everything resets
-
-#define FORCE_SENSOR_PIN A0 // the FSR and 10K pulldown are connected to A0
-#define suction_pump 3 // change suction pump connection to pin 3 to avoid clash with active states
 
 
+#define distance_SENSOR_PIN A0 // the FSR and 10K pulldown are connected to A0
+#define suction_pump 5 // change suction pump connection to pin 3 to avoid clash with active states
+#define echoPin 2 // attach pin D4 Arduino to pin Echo of HC-SR04
+#define trigPin 3 //attach pin D5 Arduino to pin Trig of HC-SR04
 
 // defines variables
-bool force_sensed = false;
 bool suction_active = false;
-garbage_quick_sort_robot_msg::RobotState current_global_state;
-int suction_active_states[7] = {5, 6, 7, 8, 9, 10, 11};
+long duration;
+int distance; 
 
 //Publishers
-std_msgs::Bool suction_msg;
-std_msgs::Int16 force_msg;
-
-ros::Publisher suction_pub("/garbage_quick_sort/arduino/suction_active", &suction_msg); 
-ros::Publisher force_pub("/garbage_quick_sort/arduino/force", &force_msg); 
+std_msgs::Int16 distance_msg;
+ros::Publisher distance_pub("/garbage_quick_sort/arduino/distance", &distance_msg); 
 
 ros::NodeHandle nh;
 
-
-void globalStateCallback(const garbage_quick_sort_robot_msg::RobotState& msg)
+void suctionCallback(const std_msgs::Bool& msg)
 {
-  current_global_state = msg;
-  if ((current_global_state.robot_state == suction_active_states[0]) || (current_global_state.robot_state == suction_active_states[1]) ||
-            (current_global_state.robot_state == suction_active_states[2]) || (current_global_state.robot_state == suction_active_states[3]) ||
-            (current_global_state.robot_state == suction_active_states[4]) || (current_global_state.robot_state == suction_active_states[5])
-            || (current_global_state.robot_state == suction_active_states[6])){
-              nh.loginfo("Arduino State");
-
-            }
-
+  suction_active = msg.data;
 }
-
 
 //Callback
-ros::Subscriber<garbage_quick_sort_robot_msg::RobotState> global_state_sub("/garbage_quick_sort/global_state", &globalStateCallback);
-
-bool force_reading()
-{
-  int analogReading = analogRead(FORCE_SENSOR_PIN);
-  force_msg.data = analogReading;
+ros::Subscriber<std_msgs::Bool> suction_sub("/garbage_quick_sort/arduino/suction_active", &suctionCallback);
+//
+//bool distance_reading()
+//{
+//  int analogReading = analogRead(distance_SENSOR_PIN);
+//  distance_msg.data = analogReading;
 //  Serial.println(analogReading);
-  if (analogReading > 100)
-  {
-    return true;
-  }
+//}
 
-  else
-  {
-    return false;
-  }
+void distance_reading() {
+  // Clears the trigPin condition
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  // Sets the trigPin HIGH (ACTIVE) for 10 microseconds
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  // Reads the echoPin, returns the sound wave travel time in microseconds
+  duration = pulseIn(echoPin, HIGH);
+  // Calculating the distance
+  distance = duration * 0.034 / 2; // Speed of sound wave divided by 2 (go and back)
+  // Displays the distance on the Serial Monitor
+  Serial.print("Distance: ");
+  Serial.print(distance);
+  Serial.println(" cm");
+  distance_msg.data = distance;
 }
-    
+
+
 void setup() 
 {
   pinMode(suction_pump, OUTPUT);
+  pinMode(trigPin, OUTPUT); // Sets the trigPin as an OUTPUT
+  pinMode(echoPin, INPUT); // Sets the echoPin as an INPUT
   Serial.begin(57600); // // Serial Communication is starting with 9600 of baudrate speed
 
   nh.initNode();
-  nh.advertise(suction_pub);
-  nh.advertise(force_pub);
-  nh.subscribe(global_state_sub);
+  nh.advertise(distance_pub);
+  nh.subscribe(suction_sub);
 }
 
 void loop() 
 {
-//      digitalWrite(suction_pump, LOW);
-//      Serial.println("active");
-//      delay(2000);
-//      
-////      digitalWrite(suction_pump, HIGH);
-////      Serial.println("no");
-////          delay(2000);
-
 
   nh.spinOnce();
-  // if moving down and force sensor detects, latch on the suction
-  force_reading();
-  if ((current_global_state.robot_state == suction_active_states[0]) && (!suction_active))
-  {
-    //suction_active = force_reading();
-    nh.loginfo("set suction true");
-    suction_active = true;
-    //if (suction_active) {delay(500);}
-  }
+  // if moving down and distance sensor detects, latch on the suction
+  distance_reading();
   
-  // if in any of the other active states and suction was latched high, keep it latched high
-  else if ((current_global_state.robot_state == suction_active_states[0]) || (current_global_state.robot_state == suction_active_states[1]) ||
-            (current_global_state.robot_state == suction_active_states[2]) || (current_global_state.robot_state == suction_active_states[3]) ||
-            (current_global_state.robot_state == suction_active_states[4]) || (current_global_state.robot_state == suction_active_states[5])
-            || (current_global_state.robot_state == suction_active_states[6]))
+  // keep publishing suction message for state machine to change state!
+  if (suction_active)
   {
-    if(suction_active)
-    {
-      digitalWrite(suction_pump, LOW);
-      nh.loginfo("active");
-    }
-
-//    else
-//    {
-//      digitalWrite(suction_pump, HIGH);
-//      //reset suction_active
-//      nh.loginfo("no");
-//
-//      if (suction_active) suction_active = false;
-//    }
+    digitalWrite(suction_pump, LOW);
   }
-    
-  // if not in active state, then suction LOW
+
   else
   {
     digitalWrite(suction_pump, HIGH);
-    //reset suction_active
-      nh.loginfo("no2");
-
-    if (suction_active) suction_active = false;
   }
-  
-  // keep publishing suction message for state machine to change state!
-
-  suction_msg.data = suction_active;
-  suction_pub.publish(&suction_msg);  
-  force_pub.publish(&force_msg);
+ 
+  distance_pub.publish(&distance_msg);
   delay(10);
 }

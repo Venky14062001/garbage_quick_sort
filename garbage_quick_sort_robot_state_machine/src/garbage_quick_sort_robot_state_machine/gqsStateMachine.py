@@ -6,6 +6,7 @@ import rospy
 import enum
 from garbage_quick_sort_robot_msg.msg import RobotState, EffectorPose
 from garbage_quick_sort_robot_msg.srv import RobotStateFbk, RobotStateFbkRequest, RobotStateFbkResponse, EffectorPoseFbk, EffectorPoseFbkRequest, EffectorPoseFbkResponse
+from std_msgs.msg import Float32
 
 import numpy as np
 class RobotStateEnum(enum.Enum):
@@ -24,7 +25,7 @@ class RobotStateEnum(enum.Enum):
 class GarbageQuickSortRobotStateMachine:
     def __init__(self):
         rospy.init_node("GarbageQuickSortStateMachine", anonymous=True)
-        self.state = RobotStateEnum.GoPickHome #RobotStateEnum.GoPickHome
+        self.state = RobotStateEnum.GoPickHome
 
         # define required poses here
         self.pick_home_pose = EffectorPose()
@@ -77,6 +78,10 @@ class GarbageQuickSortRobotStateMachine:
         self.camera_home_pose.z = 0.15
         self.camera_home_pose.phi = -1.571 
 
+        # value to double confirm ultrasonic pickup
+        self.ultrasonic_pickup_confirm = 4 #cm
+        self.ultrasonic_mean_reading = Float32()
+
         self.state_publisher =rospy.Publisher(
             "/garbage_quick_sort/global_state", 
             RobotState, queue_size=10
@@ -109,7 +114,12 @@ class GarbageQuickSortRobotStateMachine:
         except rospy.ServiceException as e:
             print("YOLO target pose service object failed: ", e)
 
+        # subscribe to ultrasonic mean readings
+        self.ultrasonic_mean_sub = rospy.Subscriber('/garbage_quick_sort/arduino/ultrasonic_mean', Float32, self.ultrasonic_mean_callback)
         print("Garbage Quick Sort state machine activated :) !")
+
+    def ultrasonic_mean_callback(self, msg):
+        self.ultrasonic_mean_reading = msg
 
     def run(self):
         # add a statement to get input on whether to start program
@@ -167,7 +177,7 @@ class GarbageQuickSortRobotStateMachine:
                         self.target_type = target_fbk.type
                         target_pose_array = np.array([target_fbk.pose_value.x, target_fbk.pose_value.y, 0, 1])
 
-                        global_target = np.array([target_pose_array[0] + self.camera_home_pose.x, target_pose_array[1] + self.camera_home_pose.y, 0.15, -1.571])
+                        global_target = np.array([target_pose_array[0] + self.camera_home_pose.x, target_pose_array[1] + self.camera_home_pose.y, 0.18, -1.571])
 
                         self.global_target_pose.x = global_target[0]
                         self.global_target_pose.y = global_target[1]
@@ -290,23 +300,28 @@ class GarbageQuickSortRobotStateMachine:
                         pass
 
                 elif (self.state == RobotStateEnum.TransGoPickUpLocAgainGoDropLoc):
-                    if self.target_type == 1: 
-                        self.state = RobotStateEnum.GoDropLoc1
-                        print("Changing state to GoDropLoc1")
-                        # reset target_type
-                        self.target_type = None
-                    elif self.target_type == 2:
-                        self.state = RobotStateEnum.GoDropLoc2
-                        print("Changing state to GoDropLoc2")
-                        # reset target_type
-                        self.target_type = None
-                    elif self.target_type == 3:
-                        self.state = RobotStateEnum.GoDropLoc3
-                        print("Changing state to GoDropLoc3")
-                        # reset target_type
-                        self.target_type = None
+                    # subsribe to the readings from the ultrasonic sensor, double confirm, it has picked something
+                    if self.ultrasonic_mean_reading.data > self.ultrasonic_pickup_confirm:
+                        self.state = RobotStateEnum.GoPickHome
+                        print("Did not get object! Going back to GoPickHome")
                     else:
-                        print("Incorrect garbage type received from detect node")
+                        if self.target_type == 1: 
+                            self.state = RobotStateEnum.GoDropLoc1
+                            print("Changing state to GoDropLoc1")
+                            # reset target_type
+                            self.target_type = None
+                        elif self.target_type == 2:
+                            self.state = RobotStateEnum.GoDropLoc2
+                            print("Changing state to GoDropLoc2")
+                            # reset target_type
+                            self.target_type = None
+                        elif self.target_type == 3:
+                            self.state = RobotStateEnum.GoDropLoc3
+                            print("Changing state to GoDropLoc3")
+                            # reset target_type
+                            self.target_type = None
+                        else:
+                            print("Incorrect garbage type received from detect node")
 
                 elif (self.state == RobotStateEnum.GoDropLoc1):
                     req = RobotStateFbkRequest()
@@ -403,7 +418,7 @@ class GarbageQuickSortRobotStateMachine:
                 current_state.robot_state = self.state.value
                 self.state_publisher.publish(current_state)
 
-                rospy.sleep(0.1)
+                rospy.sleep(0.5)
             
         elif (user_input == "no"):
             return
