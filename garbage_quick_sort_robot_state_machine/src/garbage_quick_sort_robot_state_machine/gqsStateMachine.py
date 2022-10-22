@@ -31,7 +31,7 @@ class GarbageQuickSortRobotStateMachine:
         self.pick_home_pose = EffectorPose()
         self.pick_home_pose.x = 0.125
         self.pick_home_pose.y = 0.03
-        self.pick_home_pose.z = 0.15
+        self.pick_home_pose.z = 0.18
         self.pick_home_pose.phi = -1.571
 
         # 1: carboard, 2: metal, 3: plastic
@@ -39,19 +39,19 @@ class GarbageQuickSortRobotStateMachine:
         self.drop1_home_pose = EffectorPose()
         self.drop1_home_pose.x = 0.175
         self.drop1_home_pose.y = 0.20
-        self.drop1_home_pose.z = 0.15
+        self.drop1_home_pose.z = 0.18
         self.drop1_home_pose.phi = -1.571 
 
         self.drop2_home_pose = EffectorPose()
         self.drop2_home_pose.x = -0.025
         self.drop2_home_pose.y = 0.20
-        self.drop2_home_pose.z = 0.15
+        self.drop2_home_pose.z = 0.18
         self.drop2_home_pose.phi = -1.571 
 
         self.drop3_home_pose = EffectorPose()
         self.drop3_home_pose.x = 0.075
         self.drop3_home_pose.y = 0.20
-        self.drop3_home_pose.z = 0.15
+        self.drop3_home_pose.z = 0.18
         self.drop3_home_pose.phi = -1.571 
 
         # this stores the target type

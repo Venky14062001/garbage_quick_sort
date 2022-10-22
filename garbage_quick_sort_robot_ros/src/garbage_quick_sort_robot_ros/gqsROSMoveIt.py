@@ -16,7 +16,6 @@ from sensor_msgs.msg import JointState
 from std_msgs.msg import Header
 from std_msgs.msg import Bool
 
-from roboticstoolbox import jtraj
 import copy
 import pandas as pd
 
@@ -250,42 +249,13 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
         else:
             return 0
 
-    # this function creates the required trajectory message based on current state and goal
-    def create_trajectory_msg(self, joint_motor_frame):
-
-        # find the difference between joint states
-        diff_joint_states = np.abs(joint_motor_frame - self.joint_state_pos)
-        # find the max angle from the diff
-        max_joint_angle = np.max(diff_joint_states)
-
-        # find the time to go to the angle
-        traj_time = round(max_joint_angle * self.time_per_rad)
-
+    # this function creates the required trajectory message using moveit_plan 
+    def create_trajectory_msg(self, moveit_plan):
         traj_msg = JointTrajectory()
-        head = Header()
-        head.stamp = rospy.Time.now()
-        traj_msg.header = head
-        traj_msg.joint_names = self.joint_names
+        traj_msg.joint_names = self.joint_names 
 
-        # create a time vector
-        time_vec = np.linspace(0, traj_time, round(self.time_steps_per_sec * traj_time))
-
-        # use robotics toolbox to compute trajectory
-        try:
-            gen_traj = jtraj(self.joint_state_pos, joint_motor_frame, time_vec)
-        except:
-            return False, None
-
-        for i in range(len(gen_traj)):
-            tmp_traj_pt = JointTrajectoryPoint()
-
-            tmp_traj_pt.positions = gen_traj.s[i]
-            tmp_traj_pt.velocities = gen_traj.sd[i]
-            tmp_traj_pt.accelerations = gen_traj.sdd[i]
-
-            tmp_traj_pt.time_from_start = Duration(time_vec[i])
-
-            traj_msg.points.append(tmp_traj_pt)
+        traj_msg.header = moveit_plan[1].joint_trajectory.header
+        traj_msg.points = moveit_plan[1].joint_trajectory.points
 
         return True, traj_msg
 
@@ -338,33 +308,32 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
                 self.move_group.stop()
                 rospy.sleep(0.5)
 
-                # get state again and plan to goal state
-                moveit_goal_joint_vals = self.move_group.get_current_joint_values()
-                moveit_goal_joint_vals[0] = sel_ik_joint_sol[0] 
-                moveit_goal_joint_vals[1] = sel_ik_joint_sol[1] 
-                moveit_goal_joint_vals[2] = sel_ik_joint_sol[2] 
-                moveit_goal_joint_vals[3] = sel_ik_joint_sol[3] 
-
-                # add offset to joint_goal
                 sel_ik_joint_sol_off = copy.deepcopy(sel_ik_joint_sol)
-
                 sel_ik_joint_sol_off[0] = sel_ik_joint_sol[0] + self.home_offset[0] 
                 sel_ik_joint_sol_off[1] = sel_ik_joint_sol[1] + self.home_offset[1]
                 sel_ik_joint_sol_off[2] = sel_ik_joint_sol[2] + self.home_offset[2]
                 sel_ik_joint_sol_off[3] = sel_ik_joint_sol[3] + self.home_offset[3]
 
-                sel_ik_joint_sol_off = np.array(sel_ik_joint_sol_off)
-                revise_plan = self.create_trajectory_msg(sel_ik_joint_sol_off)
+                # get state again and plan to goal state
+                moveit_goal_joint_vals = self.move_group.get_current_joint_values()
+                moveit_goal_joint_vals[0] = sel_ik_joint_sol_off[0]
+                moveit_goal_joint_vals[1] = sel_ik_joint_sol_off[1]
+                moveit_goal_joint_vals[2] = sel_ik_joint_sol_off[2]
+                moveit_goal_joint_vals[3] = sel_ik_joint_sol_off[3]
+
+                # when generating trajectory, try to change timestamps
+                self.move_group.set_joint_value_target(moveit_goal_joint_vals)
+                plan = self.move_group.plan()
 
                 # check if planning succeeded
-                if (revise_plan[0]):
-                    self.traj_success = True
-
+                if (plan[0]):
+                    self.moveit_traj_success = True
+                    revise_plan = self.create_trajectory_msg(plan)
                 else:
-                    print("Toolbox unable to plan trajectory!")
+                    print("MoveIt! unable to plan trajectory!")
                     self.goal_commanded = True
-                    self.traj_success = False
-                    return
+                    self.moveit_traj_success = False
+                    return 
 
                 self.joint_goal_publisher.publish(revise_plan[1])
 
@@ -374,10 +343,6 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
                 self.goal_receive_time = rospy.Time.now()
 
                 self.robot_pose = pose
-
-                # when generating trajectory, try to change timestamps
-                self.move_group.set_joint_value_target(moveit_goal_joint_vals)
-                self.move_group.plan()
 
                 # also publish to RViz for visualization
                 self.move_group.go(wait=True)
