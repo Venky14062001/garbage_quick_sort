@@ -1,0 +1,41 @@
+<package format="3">
+  <name>joint_trajectory_generator</name>
+  <version>0.0.12</version>
+  <description>
+    joint_trajectory_generator action takes in a trajectory specified
+    by a number of joint positions, and it generates a new smooth trajectory
+    through these joint positions.
+  </description>
+
+  <maintainer email="ros-orphaned-packages@googlegroups.com">ROS Orphaned Package Maintainers</maintainer>
+
+  <author>Eitan Marder-Eppstein</author>
+  <author>Wim Meeusen</author>
+
+  <license>BSD</license>
+
+  <url type="website">http://ros.org/wiki/joint_trajectory_generator</url>
+  <url type="bugtracker">https://github.com/PR2/pr2_common_actions/issues</url>
+  <url type="repository">https://github.com/PR2/pr2_common_actions</url>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <build_depend>actionlib</build_depend>
+  <build_depend>angles</build_depend>
+  <build_depend condition="$ROS_DISTRO != noetic">orocos_kdl</build_depend>
+  <build_depend condition="$ROS_DISTRO == noetic">liborocos-kdl-dev</build_depend>
+  <build_depend>joint_trajectory_action</build_depend>
+  <build_depend>pr2_controllers_msgs</build_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>urdf</build_depend>
+
+  <exec_depend>actionlib</exec_depend>
+  <exec_depend>angles</exec_depend>
+  <exec_depend condition="$ROS_DISTRO != noetic">orocos_kdl</exec_depend>
+  <exec_depend condition="$ROS_DISTRO == noetic">liborocos-kdl</exec_depend>
+  <exec_depend>joint_trajectory_action</exec_depend>
+  <exec_depend>pr2_controllers_msgs</exec_depend>
+  <exec_depend>roscpp</exec_depend>
+  <exec_depend>urdf</exec_depend>
+
+</package>
