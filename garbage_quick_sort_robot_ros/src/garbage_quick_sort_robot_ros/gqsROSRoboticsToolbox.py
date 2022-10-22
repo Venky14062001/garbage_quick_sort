@@ -192,7 +192,7 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
                     # if suction is activated, goal completed
                     if self.suction_state:
                         # print(self.suction_state)
-                        rospy.sleep(0.5)
+                        rospy.sleep(0.2)
                         self.reached_goal = 3
                         self.robot_pose = None
                     elif np.all(np.less_equal(np.abs(self.joint_state_pos - self.current_goal), self.goal_tolerance)):

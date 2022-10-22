@@ -21,7 +21,7 @@ import pandas as pd
 
 '''This class acts as a ROS Node to interface with Dynamixel Motors and MoveIt!, subscribes to joint state and publishes trajectory when joint goal is received'''
 
-class GarbageQuickSortRobotROSRoboticsToolbox:
+class GarbageQuickSortRobotROSMoveIt:
     def __init__(self):
         rospy.init_node("GarbageQuickSortROS", anonymous=True)
 
@@ -63,7 +63,7 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
 
         # check if goal is commanded
         self.goal_commanded = False
-        self.goal_tolerance = np.array([0.12, 0.12, 0.12, 0.12])
+        self.goal_tolerance = np.array([0.18, 0.18, 0.18, 0.18])
         # 0 is no goal received, 1 is in progress, 2 is failure, 3 is success
         self.reached_goal = 0
         self.goal_receive_time = None
@@ -191,7 +191,7 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
                     # if suction is activated, goal completed
                     if self.suction_state:
                         # print(self.suction_state)
-                        rospy.sleep(0.5)
+                        rospy.sleep(0.2)
                         self.reached_goal = 3
                         self.robot_pose = None
                     elif np.all(np.less_equal(np.abs(self.joint_state_pos - self.current_goal), self.goal_tolerance)):
@@ -206,7 +206,7 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
                     else:
                         # we can assume this state means goal is in progress (dont know if there is a better way?)
                         self.reached_goal = 1
-                elif (self.ik_soln_exists and self.traj_success):
+                elif (self.ik_soln_exists and self.moveit_traj_success):
                     if np.all(np.less_equal(np.abs(self.joint_state_pos - self.current_goal), self.goal_tolerance)):
                         self.reached_goal = 3
                     # check if goal timeout

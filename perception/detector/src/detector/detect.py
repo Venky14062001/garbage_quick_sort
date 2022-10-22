@@ -79,6 +79,7 @@ class Detection:
         self.end_effector_target_pose = None
 
         self.active_global_states = [2]
+        self.camera_height = 0.568
 
         '''Subscribers'''
         rospy.Subscriber('/garbage_quick_sort/camera/image', Image, self.image_callback) # Get image
@@ -170,25 +171,28 @@ class Detection:
 
         return res
 
-    def inference(self):
-        # print(self.goal_status)
 
-        if ((self.start_image )):#self.active_status) and ((self.goal_status!=3) or (self.goal_status!=2)
+    def frames_info_callback(self, req):
+        res = FramesInfoResponse()
+        if self.reached_target_frames_count and req:
+            res.success = True
+            res.frames_info = self.targets_info
+            self.target_frame_count = 0
+            self.reached_target_frames_count = False
+            return res
+        else:
+            res.frames_info = self.targets_info
+            res.success = False
+            return res
+
+
+    def inference(self):
+        if self.start_image:
 
             if self.is_moving():
                 return
-                
-            # get z value from server
-            # req = EffectorPoseFbkRequest()
-            # try:
-            #     detect_pose_fbk = self.detect_pose_client(req)
-            # except rospy.ServiceException as e:
-            #     print("Service call detect pose failed: ", e)
-            #     return
 
-            # z_value = detect_pose_fbk.pose_value.z
-
-            z_value = 0.568 # for testing
+            z_value = self.camera_height
 
             im, im0 = self.preprocess(self.bgr_image)
             im = torch.from_numpy(im).to(self.device) 
@@ -256,8 +260,7 @@ class Detection:
                 self.end_effector_target_pose.z = z_value # give the same z_pose 
                 self.end_effector_target_pose.phi = -np.pi/2 # maybe software can later provide this also :P , right now irrelevant because not used
 
-                #self.frame_info_collection(bounding_boxes, z_value)
-
+                # self.frame_info_collection(bounding_boxes, z_value)
 
 
             else:
@@ -265,8 +268,6 @@ class Detection:
 
             cv2.imshow(str(0), self.bgr_image)
             cv2.waitKey(1)
-        # else:
-        #     self.goal_status = 0 # not detection state
 
     def pixel2xy(self, pixel_x, pixel_y, z): # take center as origin, z in meter
         z *= 100
@@ -342,11 +343,6 @@ class Detection:
                     cv2.putText(self.bgr_image,color, center, cv2.FONT_HERSHEY_SIMPLEX, 0.6,self.bgr_colors[color],2)
             break
         self.obj_center = center
-        # try:
-        #     #print(self.pixel2xy(x,y,self.distance))
-        #     self.pixel2xy(x,y,self.distance)
-        # except UnboundLocalError:
-        #     pass
 
 
     def frame_info_collection(self, bounding_boxes, z_value):
@@ -357,6 +353,8 @@ class Detection:
 
         if self.target_frame_count >= self.target_frame_limit:
             self.reached_target_frames_count = True
+            # set the goal status to done
+            self.goal_status = 3
 
         else:
             self.target_frame_count += 1
@@ -383,3 +381,66 @@ class Detection:
             self.targets_info_per_frame.frame_count = self.target_frame_count
 
             self.targets_info.target_info.append(self.targets_info_per_frame)
+
+
+    # function to get the average (x,y) taking input the 100 frames from camera
+    def get_detection_avg(self, frames_input):
+        # first frame info is of type TargetsInfoPerFrame
+        first_frame_info_l = frames_input.target_info[0].target_info
+        # final array after collating 99 frames info
+        final_frame_info_l = deepcopy(first_frame_info_l)
+        # first frame arr and final frame arr are of type TargetCenter
+        # create a list to keep track of how many times an object has been added confidence
+        no_of_times_l = [1] * len(first_frame_info_l)
+
+        # loop through the rest 99 frames and keep adding corresponding confidences to first frame array
+        for i in range(1, len(frames_input.target_info)):
+            # get the current frame details
+            curr_frame_info_arr_l = frames_input.target_info[i].target_info
+            # loop through curr_frame_info_arr_data to find the location of each object and confidence and match
+            for object_num, object in enumerate(curr_frame_info_arr_l):
+                object_x = object.x
+                object_y = object.y
+                object_conf = object.conf
+
+                for first_object_num, first_object in enumerate(first_frame_info_l):
+                    # get the x,y of this object
+                    first_object_x = first_object.x
+                    first_object_y = first_object.y
+
+                    x_diff = abs(first_object_x - object_x)
+                    y_diff = abs(first_object_y - object_y)
+
+                    if ((x_diff <= self.object_x_tolerance) and (y_diff <= self.object_y_tolerance)):
+                        if (first_object.object_class == object.object_class):
+                            # add the confidence and (x,y) for this object
+                            final_frame_info_l[first_object_num].x += object_x
+                            final_frame_info_l[first_object_num].y += object_y
+
+                            final_frame_info_l[first_object_num].conf += object_conf
+
+                            no_of_times_l[first_object_num] += 1
+                            # break out of this loop, now check for next object
+                            break
+                        # the object class is not same, pass
+                        else:
+                            pass
+                    # the object is not close by, pass
+                    else:
+                        pass
+
+        # now loop through the entire final_frame_info_l to find the highest confidence object
+        max_conf_obj = final_frame_info_l[0]
+        max_conf_obj_num = 0
+        for j_num, j in enumerate(final_frame_info_l):
+            if (j.conf > max_conf_obj.conf):
+                max_conf_obj = final_frame_info_l[j_num]
+                max_conf_obj_num = j_num
+            else:
+                pass
+
+        # now get the average (x,y) for the max_conf_obj
+        avg_x = max_conf_obj.x / no_of_times_l[max_conf_obj_num]
+        avg_y = max_conf_obj.y / no_of_times_l[max_conf_obj_num]
+
+        return avg_x, avg_y

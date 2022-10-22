@@ -15,16 +15,21 @@
     <include file="$(find detector)/launch/detect.launch">
     </include>    
 
-
+    <include file="$(find garbage_quick_sort_robot_moveit_config)/launch/demo.launch">
+    </include>    
 
     <!-- Helper nodes -->
-    <node type="gqsMainRoboticsToolbox" name="gqsMainRoboticsToolbox" pkg="garbage_quick_sort_robot_ros" args="-d $(find garbage_quick_sort_robot_ros)/scripts/gqsMainRoboticsToolbox"/>
+<!--     <node type="gqsMainRoboticsToolbox" name="gqsMainRoboticsToolbox" pkg="garbage_quick_sort_robot_ros" args="-d $(find garbage_quick_sort_robot_ros)/scripts/gqsMainRoboticsToolbox"/>
+ -->
+    <node type="gqsMainMoveIt" name="gqsMainMoveIt" pkg="garbage_quick_sort_robot_ros" args="-d $(find garbage_quick_sort_robot_ros)/scripts/gqsMainMoveIt"/>
 
     <node type="pub_image" name="pub_image" pkg="detector" args="-d $(find detector)/scripts/pub_image"/>
 
+    <node type="gqsMainStateMachine" name="gqsMainStateMachine" pkg="garbage_quick_sort_robot_state_machine" args="-d $(find garbage_quick_sort_robot_state_machine)/scripts/gqsMainStateMachine"/>
+
+    <node type="arduino_handler.py" name="arduino_handler" pkg="garbage_quick_sort_robot_arduino" args="-d $(find garbage_quick_sort_robot_arduino)/scripts/arduino_handler.py"/>
+
 <!--     <node type="gqsMainStateMachine" name="gqsMainStateMachine" pkg="garbage_quick_sort_robot_state_machine" args="-d $(find garbage_quick_sort_robot_state_machine)/scripts/gqsMainStateMachine"/>
- -->
-<!--     <node type="arduino_handler.py" name="arduino_handler" pkg="garbage_quick_sort_robot_arduino" args="-d $(find garbage_quick_sort_robot_arduino)/scripts/arduino_handler.py"/>
  -->
 
 </launch>

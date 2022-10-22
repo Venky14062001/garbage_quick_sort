@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 import rospy
-from garbage_quick_sort_robot_ros.gqsROSRoboticsToolbox import GarbageQuickSortRobotROSRoboticsToolbox
+from garbage_quick_sort_robot_ros.gqsROSMoveIt import GarbageQuickSortRobotROSMoveIt
 
 if __name__=='__main__':
-    GarbageQuickSortRobotROSRoboticsToolbox()
+    GarbageQuickSortRobotROSMoveIt()
     rospy.spin()
 
 
