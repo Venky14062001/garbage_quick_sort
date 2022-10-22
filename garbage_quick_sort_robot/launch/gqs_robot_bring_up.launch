@@ -21,7 +21,9 @@
     <!-- Helper nodes -->
 <!--     <node type="gqsMainRoboticsToolbox" name="gqsMainRoboticsToolbox" pkg="garbage_quick_sort_robot_ros" args="-d $(find garbage_quick_sort_robot_ros)/scripts/gqsMainRoboticsToolbox"/>
  -->
-    <node type="gqsMainMoveIt" name="gqsMainMoveIt" pkg="garbage_quick_sort_robot_ros" args="-d $(find garbage_quick_sort_robot_ros)/scripts/gqsMainMoveIt"/>
+<!--     <node type="gqsMainMoveIt" name="gqsMainMoveIt" pkg="garbage_quick_sort_robot_ros" args="-d $(find garbage_quick_sort_robot_ros)/scripts/gqsMainMoveIt"/>
+ -->
+    <node type="gqsMainCustomTraj" name="gqsMainCustomTraj" pkg="garbage_quick_sort_robot_ros" args="-d $(find garbage_quick_sort_robot_ros)/scripts/gqsMainCustomTraj"/>
 
     <node type="pub_image" name="pub_image" pkg="detector" args="-d $(find detector)/scripts/pub_image"/>
 

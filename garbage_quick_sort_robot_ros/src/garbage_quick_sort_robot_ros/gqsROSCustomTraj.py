@@ -77,8 +77,8 @@ class GarbageQuickSortRobotROSCustomTraj:
         self.traj_success = False
 
         # time to cover 1rad angle (based on max angle to cover)
-        self.time_per_rad = 0.8
-        self.time_steps_per_sec = 5
+        self.time_per_rad = 0.4
+        self.time_steps_per_sec = 3
 
         # monitor if need to be activated
         self.active = False
@@ -258,9 +258,9 @@ class GarbageQuickSortRobotROSCustomTraj:
         # create the sinusoidal position vector
         pos_arr = start_pos + (pos_mag_diff * np.sin(sin_time_arr))
         # get the velocity vector
-        vel_arr = np.concatenate(np.diff(pos_arr), np.array([0]))
+        vel_arr = np.concatenate((np.diff(pos_arr), np.array([0])))
         # get the acceleration vector
-        acc_arr = np.concatenate(np.diff(vel_arr), np.array([0]))
+        acc_arr = np.concatenate((np.diff(vel_arr), np.array([0])))
 
         return pos_arr, vel_arr, acc_arr
 
