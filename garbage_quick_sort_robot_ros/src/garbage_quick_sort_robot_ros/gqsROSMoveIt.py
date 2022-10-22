@@ -355,12 +355,12 @@ class GarbageQuickSortRobotROSMoveIt:
                     return 
 
                 # publish the revise plan to gqsJointSmooth node
-                self.rough_traj_pub.publish(revise_plan[1])
+                # self.rough_traj_pub.publish(revise_plan[1])
                 # wait for sometime to generate traj
-                rospy.sleep(0.2)
+                # rospy.sleep(0.2)
 
                 # send the smooth goal to servo
-                self.joint_goal_publisher.publish(self.smooth_traj)
+                self.joint_goal_publisher.publish(revise_plan[1])
 
                 # update goal status
                 self.goal_commanded = True
