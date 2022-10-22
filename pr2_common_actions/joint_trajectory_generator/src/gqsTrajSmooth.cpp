@@ -43,7 +43,7 @@ void gqsTraj::trajSmoothCallback(const trajectory_msgs::JointTrajectory& traj_in
 int main(int argc, char** argv)
 {
   ros::init(argc, argv, "gqs_traj_smooth_node");
-  gqsTraj gqsTrajSmoother(4, 3.0, 0.2);
+  gqsTraj gqsTrajSmoother(4, 12.0, 1.0);
 
   while(ros::ok())
   {

@@ -21,7 +21,7 @@ import pandas as pd
 
 '''This class acts as a ROS Node to interface with Dynamixel Motors and MoveIt!, subscribes to joint state and publishes trajectory when joint goal is received'''
 
-class GarbageQuickSortRobotROSRoboticsToolbox:
+class GarbageQuickSortRobotROSMoveIt:
     def __init__(self):
         rospy.init_node("GarbageQuickSortROS", anonymous=True)
 
@@ -225,7 +225,7 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
                     else:
                         # we can assume this state means goal is in progress (dont know if there is a better way?)
                         self.reached_goal = 1
-                elif (self.ik_soln_exists and self.traj_success):
+                elif (self.ik_soln_exists and self.moveit_traj_success):
                     if np.all(np.less_equal(np.abs(self.joint_state_pos - self.current_goal), self.goal_tolerance)):
                         self.reached_goal = 3
                     # check if goal timeout
@@ -360,7 +360,7 @@ class GarbageQuickSortRobotROSRoboticsToolbox:
                 rospy.sleep(0.2)
 
                 # send the smooth goal to servo
-                self.joint_goal_publisher(self.smooth_traj)
+                self.joint_goal_publisher.publish(self.smooth_traj)
 
                 # update goal status
                 self.goal_commanded = True

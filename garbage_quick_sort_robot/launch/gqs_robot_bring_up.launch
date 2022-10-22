@@ -29,7 +29,9 @@
 
     <node type="arduino_handler.py" name="arduino_handler" pkg="garbage_quick_sort_robot_arduino" args="-d $(find garbage_quick_sort_robot_arduino)/scripts/arduino_handler.py"/>
 
+    <node type="gqsJointSmooth" name="gqsJointSmooth" pkg="joint_trajectory_generator" args="-d $(find joint_trajectory_generator)/scripts/gqsJointSmooth"/>
+
+
 <!--     <node type="gqsMainStateMachine" name="gqsMainStateMachine" pkg="garbage_quick_sort_robot_state_machine" args="-d $(find garbage_quick_sort_robot_state_machine)/scripts/gqsMainStateMachine"/>
  -->
-
 </launch>
