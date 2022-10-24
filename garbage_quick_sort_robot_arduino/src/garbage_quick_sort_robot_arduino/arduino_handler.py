@@ -74,7 +74,7 @@ class ArduinoHandler:
 			# reset index to 0
 			self.roll_mean_index = 0
 
-		self.distance_roll_mean_size[self.roll_mean_index] = msg.data
+		self.distance_roll_mean_buffer[self.roll_mean_index] = msg.data
 
 		# increase index
 		self.roll_mean_index += 1

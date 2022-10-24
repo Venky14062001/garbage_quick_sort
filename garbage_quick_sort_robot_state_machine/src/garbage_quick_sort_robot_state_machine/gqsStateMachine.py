@@ -30,28 +30,28 @@ class GarbageQuickSortRobotStateMachine:
 
         # define required poses here
         self.pick_home_pose = EffectorPose()
-        self.pick_home_pose.x = 0.125
-        self.pick_home_pose.y = 0.03
+        self.pick_home_pose.x = 0.154
+        self.pick_home_pose.y = 0.0
         self.pick_home_pose.z = 0.18
         self.pick_home_pose.phi = -1.571
 
         # 1: carboard, 2: metal, 3: plastic
 
         self.drop1_home_pose = EffectorPose()
-        self.drop1_home_pose.x = 0.175
-        self.drop1_home_pose.y = 0.20
+        self.drop1_home_pose.x = 0.104
+        self.drop1_home_pose.y = 0.30
         self.drop1_home_pose.z = 0.18
         self.drop1_home_pose.phi = -1.571 
 
         self.drop2_home_pose = EffectorPose()
-        self.drop2_home_pose.x = -0.025
-        self.drop2_home_pose.y = 0.20
+        self.drop2_home_pose.x = 0.104
+        self.drop2_home_pose.y = -0.20
         self.drop2_home_pose.z = 0.18
         self.drop2_home_pose.phi = -1.571 
 
         self.drop3_home_pose = EffectorPose()
-        self.drop3_home_pose.x = 0.075
-        self.drop3_home_pose.y = 0.20
+        self.drop3_home_pose.x = 0.304
+        self.drop3_home_pose.y = -0.20
         self.drop3_home_pose.z = 0.18
         self.drop3_home_pose.phi = -1.571 
 
@@ -74,8 +74,8 @@ class GarbageQuickSortRobotStateMachine:
 
         # store the camera center location
         self.camera_home_pose = EffectorPose()
-        self.camera_home_pose.x = 0.405
-        self.camera_home_pose.y = 0.070
+        self.camera_home_pose.x = 0.245
+        self.camera_home_pose.y = 0.125
         self.camera_home_pose.z = 0.15
         self.camera_home_pose.phi = -1.571 
 
@@ -180,7 +180,11 @@ class GarbageQuickSortRobotStateMachine:
                         self.target_type = target_fbk.type
                         target_pose_array = np.array([target_fbk.pose_value.x, target_fbk.pose_value.y, 0, 1])
 
+                        print(target_pose_array)
+
                         global_target = np.array([target_pose_array[0] + self.camera_home_pose.x, target_pose_array[1] + self.camera_home_pose.y, 0.18, -1.571])
+
+                        print(global_target)
 
                         self.global_target_pose.x = global_target[0]
                         self.global_target_pose.y = global_target[1]

@@ -70,14 +70,14 @@ class GarbageQuickSortRobotROSCustomTraj:
 
         # an attempt to solve the constant offset
         # offset assumed to be proportional to torque experienced (COM calculated)
-        self.home_offset = np.array([0.05, 0.21, 0.07, 0.00]) # without pump
+        self.home_offset = np.array([0.05, 0.11, 0.24, 0.00]) 
 
         self.ik_soln_exists = False
         self.traj_success = False
 
         # time to cover 1rad angle (based on max angle to cover)
         self.traj_duration_global = 0.25
-        self.time_per_rad = 1.2
+        self.time_per_rad = 0.4
         self.number_time_steps = 2
 
         # monitor if need to be activated
@@ -336,17 +336,17 @@ class GarbageQuickSortRobotROSCustomTraj:
                     return 
 
                 # check if joint soln is within limits
-                joint_valid_check = self.check_joint_limits(ik_joint_sol)
+                joint_valid_check = self.check_joint_limits(ik_joint_sol[1])
 
                 # choose the solution based on output (prefer EU config)
                 if (joint_valid_check == 3):
-                    sel_ik_joint_sol = ik_joint_sol["EU"]
+                    sel_ik_joint_sol = ik_joint_sol[1]["EU"]
                     self.ik_soln_exists = True
                 elif (joint_valid_check == 2):
-                    sel_ik_joint_sol = ik_joint_sol["EU"]
+                    sel_ik_joint_sol = ik_joint_sol[1]["EU"]
                     self.ik_soln_exists = True
                 elif (joint_valid_check == 1):
-                    sel_ik_joint_sol = ik_joint_sol["ED"]
+                    sel_ik_joint_sol = ik_joint_sol[1]["ED"]
                     self.ik_soln_exists = True
                 else:
                     rospy.logerr("No valid joint IK solution found! Aborting pose goal request")
