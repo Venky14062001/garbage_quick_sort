@@ -29,7 +29,7 @@ class ArduinoHandler:
 		self.activate_suction_msg = Bool()
 		self.activate_suction_msg.data = False
 
-		self.trigger_value = 3.5
+		self.trigger_value = 5
 
 		self.suction_active_states = [5, 6, 7, 8, 9, 10, 11]
 		self.move_down_state = self.suction_active_states[0]
@@ -44,7 +44,7 @@ class ArduinoHandler:
 
 	def ultrasonic_mean_server_callback(self, req):
 		res = UltrasonicMeanFbkResponse()
-		res.sensor_mean = self.avg_ultrasonic
+		res.sensor_mean = self.avg_ultrasonic.data
 		
 		return res
 

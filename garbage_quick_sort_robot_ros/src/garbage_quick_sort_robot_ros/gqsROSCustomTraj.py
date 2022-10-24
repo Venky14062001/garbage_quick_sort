@@ -77,7 +77,7 @@ class GarbageQuickSortRobotROSCustomTraj:
 
         # time to cover 1rad angle (based on max angle to cover)
         self.traj_duration_global = 0.25
-        self.time_per_rad = 0.4
+        self.time_per_rad = 0.5
         self.number_time_steps = 2
 
         # monitor if need to be activated
@@ -191,7 +191,7 @@ class GarbageQuickSortRobotROSCustomTraj:
                     if (self.ik_soln_exists and self.custom_traj_success):
                         # if suction is activated, goal completed
                         if self.suction_state:
-                            rospy.sleep(0.5)
+                            rospy.sleep(0.1)
                             self.reached_goal = 3
                             self.robot_pose = None
                         elif np.all(np.less_equal(np.abs(self.joint_state_pos - self.current_goal), self.goal_tolerance)):

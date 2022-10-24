@@ -74,8 +74,8 @@ class GarbageQuickSortRobotStateMachine:
 
         # store the camera center location
         self.camera_home_pose = EffectorPose()
-        self.camera_home_pose.x = 0.245
-        self.camera_home_pose.y = 0.125
+        self.camera_home_pose.x = 0.399
+        self.camera_home_pose.y = 0.115
         self.camera_home_pose.z = 0.15
         self.camera_home_pose.phi = -1.571 
 
@@ -315,7 +315,7 @@ class GarbageQuickSortRobotStateMachine:
                         print("Service call ultrasonic mean failed: ", e)
                         continue
 
-                    if self.ultrasonic_mean_reading.data > self.ultrasonic_pickup_confirm:
+                    if self.ultrasonic_mean_reading.sensor_mean > self.ultrasonic_pickup_confirm:
                         self.state = RobotStateEnum.GoPickHome
                         print("Did not get object! Going back to GoPickHome")
                     else:
@@ -417,7 +417,7 @@ class GarbageQuickSortRobotStateMachine:
                 current_state.robot_state = self.state.value
                 self.state_publisher.publish(current_state)
 
-                rospy.sleep(0.1)
+                rospy.sleep(0.2)
             
         elif (user_input == "no"):
             return
