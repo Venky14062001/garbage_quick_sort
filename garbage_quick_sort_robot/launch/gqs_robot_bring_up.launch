@@ -1,48 +1,31 @@
 <?xml version="1.0"?>
 
 <launch>
-    
+   
     <!-- Initiate communication with Arduino -->
     <node name="serial_node"        pkg="rosserial_python"      type="serial_node.py">
-    <param name="port"              type="string"               value="/dev/ttyACM0"/>
-    <param name="baud"              type="int"                  value="57600"/>
+        <param name="port"              type="string"               value="/dev/ttyACM0"/>
+        <param name="baud"              type="int"                  value="57600"/>
     </node>
+    <!-- Launch the Arduino handler node -->
+    <node type="gqsMainArduinoHandler" name="arduino_handler" pkg="garbage_quick_sort_robot_arduino" args="-d $(find garbage_quick_sort_robot_arduino)/scripts/gqsMainArduinoHandler"/>
 
+    <!-- Only used to visualise the robot -->
+    <include file="$(find garbage_quick_sort_robot_moveit_config)/launch/demo.launch"></include>
 
-    <include file="$(find dynamixel_workbench_controllers)/launch/gqs_dynamixel_controllers.launch">
-    </include>
+    <!-- Launch dynamixel servos -->
+    <include file="$(find dynamixel_workbench_controllers)/launch/gqs_dynamixel_controllers.launch"> </include>
 
-    <include file="$(find detector)/launch/detect.launch">
-    </include>    
+    <!-- Launch the perception node -->
+    <include file="$(find detector)/launch/detect.launch"> </include> 
+    <node type="pub_image" name="pub_image" pkg="detector" args="-d $(find detector)/scripts/pub_image"/>   
 
+    <!-- Launch the trajectory execution node -->
+    <node type="gqsMainCustomTraj" name="gqsMainCustomTraj" pkg="garbage_quick_sort_robot_ros" args="-d $(find garbage_quick_sort_robot_ros)/scripts/gqsMainCustomTraj"/>
+    <!--<node type="gqsMainRoboticsToolbox" name="gqsMainRoboticsToolbox" pkg="garbage_quick_sort_robot_ros" args="-d $(find garbage_quick_sort_robot_ros)/scripts/gqsMainRoboticsToolbox"/>-->
+    <!--<node type="gqsMainMoveIt" name="gqsMainMoveIt" pkg="garbage_quick_sort_robot_ros" args="-d $(find garbage_quick_sort_robot_ros)/scripts/gqsMainMoveIt"/>-->
 
-<!--      <node type="gqsMainCustomTraj" name="gqsMainCustomTraj" pkg="garbage_quick_sort_robot_ros" args="-d $(find garbage_quick_sort_robot_ros)/scripts/gqsMainCustomTraj"/>
- -->
-    <node type="pub_image" name="pub_image" pkg="detector" args="-d $(find detector)/scripts/pub_image"/>
-
-    <node type="gqsMainStateMachine" name="gqsMainStateMachine" pkg="garbage_quick_sort_robot_state_machine" args="-d $(find garbage_quick_sort_robot_state_machine)/scripts/gqsMainStateMachine"/>
-
-    <node type="arduino_handler.py" name="arduino_handler" pkg="garbage_quick_sort_robot_arduino" args="-d $(find garbage_quick_sort_robot_arduino)/scripts/arduino_handler.py"/>
+    <!-- Launch the state machine! -->
+    <!-- <node type="gqsMainStateMachine" name="gqsMainStateMachine" pkg="garbage_quick_sort_robot_state_machine" args="-d $(find garbage_quick_sort_robot_state_machine)/scripts/gqsMainStateMachine"/> -->
 
 </launch>
-
-
-<!--     <include file="$(find garbage_quick_sort_robot_moveit_config)/launch/demo.launch">
-    </include>     -->
-
-    <!-- Helper nodes -->
-<!--     <node type="gqsMainRoboticsToolbox" name="gqsMainRoboticsToolbox" pkg="garbage_quick_sort_robot_ros" args="-d $(find garbage_quick_sort_robot_ros)/scripts/gqsMainRoboticsToolbox"/>
- -->
-
- 
-<!--     <node type="gqsMainMoveIt" name="gqsMainMoveIt" pkg="garbage_quick_sort_robot_ros" args="-d $(find garbage_quick_sort_robot_ros)/scripts/gqsMainMoveIt"/>
--->
-
-
-
-
-<!--     <node type="gqsJointSmooth" name="gqsJointSmooth" pkg="joint_trajectory_generator" args="-d $(find joint_trajectory_generator)/scripts/gqsJointSmooth"/>
- -->
-
-<!--     <node type="gqsMainStateMachine" name="gqsMainStateMachine" pkg="garbage_quick_sort_robot_state_machine" args="-d $(find garbage_quick_sort_robot_state_machine)/scripts/gqsMainStateMachine"/>
- -->

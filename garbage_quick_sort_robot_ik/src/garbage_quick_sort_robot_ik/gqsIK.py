@@ -37,14 +37,17 @@ class GarbageQuickSortRobotIK:
         # calculate alpha
         alpha = np.arctan2(yw, xw)
 
-        # calculate beta 
-        beta = np.arccos((np.square(self.link_lengths[1]) + np.square(self.link_lengths[2]) - np.square(xw) - np.square(yw)) / (2 * self.link_lengths[1] * self.link_lengths[2]))
+        try:
+            # calculate beta 
+            beta = np.arccos((np.square(self.link_lengths[1]) + np.square(self.link_lengths[2]) - np.square(xw) - np.square(yw)) / (2 * self.link_lengths[1] * self.link_lengths[2]))
+            # calculate gamma
+            gamma = np.arccos((np.square(xw) + np.square(yw) + np.square(self.link_lengths[1]) - np.square(self.link_lengths[2])) / (2 * self.link_lengths[1] * np.sqrt(np.square(xw) + np.square(yw))) )
+        except:
+            print("IK solution does not exist for the requested configuration!")
+            return (False, {"EU": np.array([None, None, None, None]), "ED": np.array([None, None, None, None])})
 
         # calculate joint angle 2
         joint_2_ed = np.pi - beta
-
-        # calculate gamma
-        gamma = np.arccos((np.square(xw) + np.square(yw) + np.square(self.link_lengths[1]) - np.square(self.link_lengths[2])) / (2 * self.link_lengths[1] * np.sqrt(np.square(xw) + np.square(yw))) )
 
         # calculate joint angle 1
         joint_1_ed = alpha - gamma
@@ -57,7 +60,7 @@ class GarbageQuickSortRobotIK:
         joint_2_eu = - joint_2_ed
         joint_3_eu = joint_3_ed + (2 * joint_2_ed) - (2 * gamma)
 
-        return {"EU": np.array([joint_0, joint_1_eu, joint_2_eu, joint_3_eu]), "ED": np.array([joint_0, joint_1_ed, joint_2_ed, joint_3_ed])}
+        return (True, {"EU": np.array([joint_0, joint_1_eu, joint_2_eu, joint_3_eu]), "ED": np.array([joint_0, joint_1_ed, joint_2_ed, joint_3_ed])})
 
     # utility functions
     def rad2deg(self, val):

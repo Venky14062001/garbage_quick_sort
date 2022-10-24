@@ -1,7 +1,6 @@
 #include <ros.h>
 #include <std_msgs/Bool.h>
-#include <std_msgs/Int16.h>
-
+#include <std_msgs/Float32.h>
 
 #define distance_SENSOR_PIN A0 // the FSR and 10K pulldown are connected to A0
 #define suction_pump 5 // change suction pump connection to pin 3 to avoid clash with active states
@@ -11,10 +10,10 @@
 // defines variables
 bool suction_active = false;
 long duration;
-int distance; 
+float distance; 
 
 //Publishers
-std_msgs::Int16 distance_msg;
+std_msgs::Float32 distance_msg;
 ros::Publisher distance_pub("/garbage_quick_sort/arduino/distance", &distance_msg); 
 
 ros::NodeHandle nh;
@@ -26,13 +25,6 @@ void suctionCallback(const std_msgs::Bool& msg)
 
 //Callback
 ros::Subscriber<std_msgs::Bool> suction_sub("/garbage_quick_sort/arduino/suction_active", &suctionCallback);
-//
-//bool distance_reading()
-//{
-//  int analogReading = analogRead(distance_SENSOR_PIN);
-//  distance_msg.data = analogReading;
-//  Serial.println(analogReading);
-//}
 
 void distance_reading() {
   // Clears the trigPin condition
@@ -53,7 +45,6 @@ void distance_reading() {
   distance_msg.data = distance;
 }
 
-
 void setup() 
 {
   pinMode(suction_pump, OUTPUT);
@@ -68,7 +59,6 @@ void setup()
 
 void loop() 
 {
-
   nh.spinOnce();
   // if moving down and distance sensor detects, latch on the suction
   distance_reading();

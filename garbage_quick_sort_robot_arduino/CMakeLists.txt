@@ -3,15 +3,14 @@ project(garbage_quick_sort_robot_arduino)
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp
+  garbage_quick_sort_robot_msg
 )
 
-catkin_package(
-  CATKIN_DEPENDS roscpp
-)
+catkin_python_setup()
+catkin_package()
 
-## Mark cpp header files for installation
-install(DIRECTORY scripts/
-DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-)
+catkin_install_python(PROGRAMS scripts/gqsMainArduinoHandler 
+                      DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+
 
 

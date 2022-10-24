@@ -20,7 +20,6 @@ import copy
 import pandas as pd
 
 '''This class acts as a ROS Node to interface with Dynamixel Motors and MoveIt!, subscribes to joint state and publishes trajectory when joint goal is received'''
-
 class GarbageQuickSortRobotROSCustomTraj:
     def __init__(self):
         rospy.init_node("GarbageQuickSortROS", anonymous=True)
@@ -29,24 +28,24 @@ class GarbageQuickSortRobotROSCustomTraj:
         self.iksolver = GarbageQuickSortRobotIK()
 
         # MoveIt! setup
-        # moveit_commander.roscpp_initialize(sys.argv)
-        # self.robot = moveit_commander.RobotCommander()
-        # self.scene = moveit_commander.PlanningSceneInterface()
+        moveit_commander.roscpp_initialize(sys.argv)
+        self.robot = moveit_commander.RobotCommander()
+        self.scene = moveit_commander.PlanningSceneInterface()
 
-        # self.group_name = "garbage_quick_sort_robot_arm"
-        # self.move_group = moveit_commander.MoveGroupCommander(self.group_name)
+        self.group_name = "garbage_quick_sort_robot_arm"
+        self.move_group = moveit_commander.MoveGroupCommander(self.group_name)
 
-        # self.planning_frame = self.move_group.get_planning_frame()
-        # self.eef_link = self.move_group.get_end_effector_link()
+        self.planning_frame = self.move_group.get_planning_frame()
+        self.eef_link = self.move_group.get_end_effector_link()
 
-        # self.group_names = self.robot.get_group_names()
+        self.group_names = self.robot.get_group_names()
 
         # dynamixel joint setup
         # store the joint limit values for the motor
         self.dynamixel_joint_limit_lower = np.array(
-            [-1.5*np.pi, -1.5*np.pi, -1.5*np.pi, -1.5*np.pi])
+            [-np.pi, -np.pi, -np.pi, -np.pi])
         self.dynamixel_joint_limit_upper = np.array(
-            [1.5*np.pi, 1.5*np.pi, 1.5*np.pi, 1.5*np.pi])
+            [np.pi, np.pi, np.pi, np.pi])
 
         # store the current joint state of the robot (the position is with respect to global frame (with respect to previous joint))
         self.joint_state_pos = None
@@ -78,6 +77,7 @@ class GarbageQuickSortRobotROSCustomTraj:
 
         # time to cover 1rad angle (based on max angle to cover)
         self.traj_duration_global = 0.25
+        self.time_per_rad = 1.2
         self.number_time_steps = 2
 
         # monitor if need to be activated
@@ -188,24 +188,28 @@ class GarbageQuickSortRobotROSCustomTraj:
             if self.goal_commanded:
                 # first check if it special state, if yes, then keep checking force sensor readings, if force sensor detects something, then complete state
                 if (self.global_state == self.special_state):
-                    # if suction is activated, goal completed
-                    if self.suction_state:
-                        # print(self.suction_state)
-                        rospy.sleep(0.5)
-                        self.reached_goal = 3
-                        self.robot_pose = None
-                    elif np.all(np.less_equal(np.abs(self.joint_state_pos - self.current_goal), self.goal_tolerance)):
-                        self.reached_goal = 3
-                    # check if goal timeout
-                    elif (rospy.Time.now().secs - self.goal_receive_time.secs) > self.reach_goal_timeout:
-                        rospy.logerr(
-                            "Goal timeout reached! Robot not reached goal state!")
+                    if (self.ik_soln_exists and self.custom_traj_success):
+                        # if suction is activated, goal completed
+                        if self.suction_state:
+                            rospy.sleep(0.5)
+                            self.reached_goal = 3
+                            self.robot_pose = None
+                        elif np.all(np.less_equal(np.abs(self.joint_state_pos - self.current_goal), self.goal_tolerance)):
+                            self.reached_goal = 3
+                        # check if goal timeout
+                        elif (rospy.Time.now().secs - self.goal_receive_time.secs) > self.reach_goal_timeout:
+                            rospy.logerr(
+                                "Goal timeout reached! Robot not reached goal state!")
+                            self.reached_goal = 2
+                            # reupdate robot_pose to None if failed
+                            self.robot_pose = None
+                        else:
+                            # we can assume this state means goal is in progress (dont know if there is a better way?)
+                            self.reached_goal = 1
+                    else:
                         self.reached_goal = 2
                         # reupdate robot_pose to None if failed
                         self.robot_pose = None
-                    else:
-                        # we can assume this state means goal is in progress (dont know if there is a better way?)
-                        self.reached_goal = 1
                 elif (self.ik_soln_exists and self.custom_traj_success):
                     if np.all(np.less_equal(np.abs(self.joint_state_pos - self.current_goal), self.goal_tolerance)):
                         self.reached_goal = 3
@@ -222,6 +226,8 @@ class GarbageQuickSortRobotROSCustomTraj:
                 # this case occurs if goal is commanded, but no soln exists, then return failure
                 else:
                     self.reached_goal = 2
+                    # reupdate robot_pose to None if failed
+                    self.robot_pose = None
             # this state means goal is not received yet, so inform corresponding nodes to publish goal again
             else:
                 self.reached_goal = 0
@@ -264,15 +270,15 @@ class GarbageQuickSortRobotROSCustomTraj:
 
         return pos_arr, vel_arr, acc_arr
 
-    # this function creates the required trajectory message using moveit_plan 
+    # this function creates the required trajectory message
     def create_trajectory_msg(self, curr_pos, goal_pos):
         # find the difference between joint states
         diff_joint_states = np.abs(goal_pos - curr_pos)
         # find the max angle from the diff
         max_joint_angle = np.max(diff_joint_states)
 
-        # find the time to go to the angle
-        traj_time = self.traj_duration_global
+        # find the time to go to the angle 
+        traj_time = (self.time_per_rad * max_joint_angle)
         time_arr = np.linspace(0, traj_time, round(self.number_time_steps))
 
         # store the traj for all joints
@@ -305,8 +311,6 @@ class GarbageQuickSortRobotROSCustomTraj:
 
             traj_msg.points.append(tmp_traj_pt)
 
-        print(traj_msg)
-
         return True, traj_msg
 
     # if a new goal pose is received, calculate joint angles, update state and call the function to publish goal
@@ -322,6 +326,14 @@ class GarbageQuickSortRobotROSCustomTraj:
                 req_pose = np.array([pose.x, pose.y, pose.z, pose.phi])
 
                 ik_joint_sol = self.iksolver.get_joint_soln(req_pose)
+                # check if an IK solution exists for the configuration
+                if ik_joint_sol[0]:
+                    pass
+                else:
+                    print("No valid IK solution exists! Please provide a new valid goal!")
+                    self.ik_soln_exists = False
+                    self.goal_commanded = True
+                    return 
 
                 # check if joint soln is within limits
                 joint_valid_check = self.check_joint_limits(ik_joint_sol)
@@ -361,23 +373,22 @@ class GarbageQuickSortRobotROSCustomTraj:
                 plan = self.create_trajectory_msg(curr_joint_pos, goal_joint_pos)
 
                 # get robot current state, make MoveIt go to that state first 
-                # moveit_start_joint_vals = self.move_group.get_current_joint_values()
-                # moveit_start_joint_vals[0] = curr_joint_pos[0]
-                # moveit_start_joint_vals[1] = curr_joint_pos[1]
-                # moveit_start_joint_vals[2] = curr_joint_pos[2]
-                # moveit_start_joint_vals[3] = curr_joint_pos[3]
+                moveit_start_joint_vals = self.move_group.get_current_joint_values()
+                moveit_start_joint_vals[0] = curr_joint_pos[0]
+                moveit_start_joint_vals[1] = curr_joint_pos[1]
+                moveit_start_joint_vals[2] = curr_joint_pos[2]
+                moveit_start_joint_vals[3] = curr_joint_pos[3]
 
                 # get MoveIt! to actual motor state
-                # self.move_group.go(moveit_start_joint_vals, wait=True)
-                # self.move_group.stop()
-                # rospy.sleep(0.1)
+                self.move_group.go(moveit_start_joint_vals, wait=True)
+                self.move_group.stop()
 
-                # # get state again and plan to goal state
-                # moveit_goal_joint_vals = self.move_group.get_current_joint_values()
-                # moveit_goal_joint_vals[0] = sel_ik_joint_sol[0]
-                # moveit_goal_joint_vals[1] = sel_ik_joint_sol[1]
-                # moveit_goal_joint_vals[2] = sel_ik_joint_sol[2]
-                # moveit_goal_joint_vals[3] = sel_ik_joint_sol[3]
+                # get state again and plan to goal state
+                moveit_goal_joint_vals = self.move_group.get_current_joint_values()
+                moveit_goal_joint_vals[0] = sel_ik_joint_sol[0]
+                moveit_goal_joint_vals[1] = sel_ik_joint_sol[1]
+                moveit_goal_joint_vals[2] = sel_ik_joint_sol[2]
+                moveit_goal_joint_vals[3] = sel_ik_joint_sol[3]
 
                 # check if planning succeeded
                 if (plan[0]):
@@ -400,8 +411,8 @@ class GarbageQuickSortRobotROSCustomTraj:
                 self.robot_pose = pose
 
                 # publish RViz for visualization
-                # self.move_group.go(moveit_goal_joint_vals)
-                # self.move_group.stop()
+                self.move_group.go(moveit_goal_joint_vals)
+                self.move_group.stop()
 
         else:
             print("Joint goal received when not active! Ignoring request!")

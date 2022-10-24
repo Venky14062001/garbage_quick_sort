@@ -5,7 +5,8 @@
 import rospy
 import enum
 from garbage_quick_sort_robot_msg.msg import RobotState, EffectorPose
-from garbage_quick_sort_robot_msg.srv import RobotStateFbk, RobotStateFbkRequest, RobotStateFbkResponse, EffectorPoseFbk, EffectorPoseFbkRequest, EffectorPoseFbkResponse
+from garbage_quick_sort_robot_msg.srv import RobotStateFbk, RobotStateFbkRequest, RobotStateFbkResponse, EffectorPoseFbk, EffectorPoseFbkRequest, EffectorPoseFbkResponse, \
+    UltrasonicMeanFbk, UltrasonicMeanFbkRequest, UltrasonicMeanFbkResponse  
 from std_msgs.msg import Float32
 
 import numpy as np
@@ -79,7 +80,7 @@ class GarbageQuickSortRobotStateMachine:
         self.camera_home_pose.phi = -1.571 
 
         # value to double confirm ultrasonic pickup
-        self.ultrasonic_pickup_confirm = 4 #cm
+        self.ultrasonic_pickup_confirm = 3.5 #cm
         self.ultrasonic_mean_reading = Float32()
 
         self.state_publisher =rospy.Publisher(
@@ -114,12 +115,14 @@ class GarbageQuickSortRobotStateMachine:
         except rospy.ServiceException as e:
             print("YOLO target pose service object failed: ", e)
 
-        # subscribe to ultrasonic mean readings
-        self.ultrasonic_mean_sub = rospy.Subscriber('/garbage_quick_sort/arduino/ultrasonic_mean', Float32, self.ultrasonic_mean_callback)
-        print("Garbage Quick Sort state machine activated :) !")
+        # create client handler to get ultrasonice mean readings
+        rospy.wait_for_service("/garbage_quick_sort/arduino/ultrasonic_mean")
+        try:
+            self.ultrasonic_mean_client_obj = rospy.ServiceProxy("/garbage_quick_sort/arduino/ultrasonic_mean", UltrasonicMeanFbk)
+        except rospy.ServiceException as e:
+            print("Ultrasonic mean service object failed: ", e)
 
-    def ultrasonic_mean_callback(self, msg):
-        self.ultrasonic_mean_reading = msg
+        print("Garbage Quick Sort state machine activated :) !")
 
     def run(self):
         # add a statement to get input on whether to start program
@@ -300,7 +303,14 @@ class GarbageQuickSortRobotStateMachine:
                         pass
 
                 elif (self.state == RobotStateEnum.TransGoPickUpLocAgainGoDropLoc):
-                    # subsribe to the readings from the ultrasonic sensor, double confirm, it has picked something
+                    # get the readings from the ultrasonic sensor, double confirm, it has picked something
+                    req = UltrasonicMeanFbkRequest()
+                    try:
+                        self.ultrasonic_mean_reading = self.ultrasonic_mean_client_obj(req)
+                    except rospy.ServiceException as e:
+                        print("Service call ultrasonic mean failed: ", e)
+                        continue
+
                     if self.ultrasonic_mean_reading.data > self.ultrasonic_pickup_confirm:
                         self.state = RobotStateEnum.GoPickHome
                         print("Did not get object! Going back to GoPickHome")
@@ -333,11 +343,6 @@ class GarbageQuickSortRobotStateMachine:
 
                     # examine response to see if task succeded, if yes, switch state, if no, abort and StayIdle
                     if ((go_robot_fbk.active_status == True) and (go_robot_fbk.goal_status == 3)):
-                        # reset global_target_pose to None
-                        self.global_target_pose.x = None
-                        self.global_target_pose.y = None
-                        self.global_target_pose.z = None
-                        self.global_target_pose.phi = None
                         print("Completed GoDropLoc1 state! Moving to next state GoPickHome")
                         self.state = RobotStateEnum.GoPickHome
                     elif ((go_robot_fbk.active_status == True) and (go_robot_fbk.goal_status == 2)):
@@ -363,11 +368,6 @@ class GarbageQuickSortRobotStateMachine:
 
                     # examine response to see if task succeded, if yes, switch state, if no, abort and StayIdle
                     if ((go_robot_fbk.active_status == True) and (go_robot_fbk.goal_status == 3)):
-                        # reset global_target_pose to None
-                        self.global_target_pose.x = None
-                        self.global_target_pose.y = None
-                        self.global_target_pose.z = None
-                        self.global_target_pose.phi = None
                         print("Completed GoDropLoc2 state! Moving to next state GoPickHome")
                         self.state = RobotStateEnum.GoPickHome
                     elif ((go_robot_fbk.active_status == True) and (go_robot_fbk.goal_status == 2)):
@@ -393,11 +393,6 @@ class GarbageQuickSortRobotStateMachine:
 
                     # examine response to see if task succeded, if yes, switch state, if no, abort and StayIdle
                     if ((go_robot_fbk.active_status == True) and (go_robot_fbk.goal_status == 3)):
-                        # reset global_target_pose to None
-                        self.global_target_pose.x = None
-                        self.global_target_pose.y = None
-                        self.global_target_pose.z = None
-                        self.global_target_pose.phi = None
                         print("Completed GoDropLoc3 state! Moving to next state GoPickHome")
                         self.state = RobotStateEnum.GoPickHome
                     elif ((go_robot_fbk.active_status == True) and (go_robot_fbk.goal_status == 2)):
@@ -418,7 +413,7 @@ class GarbageQuickSortRobotStateMachine:
                 current_state.robot_state = self.state.value
                 self.state_publisher.publish(current_state)
 
-                rospy.sleep(0.5)
+                rospy.sleep(0.1)
             
         elif (user_input == "no"):
             return

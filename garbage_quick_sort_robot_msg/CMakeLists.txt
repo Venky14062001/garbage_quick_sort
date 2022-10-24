@@ -15,6 +15,7 @@ set(MSG_FILES
 set(SRV_FILES
   RobotStateFbk.srv
   EffectorPoseFbk.srv
+  UltrasonicMeanFbk.srv
 )
 
 add_message_files(
