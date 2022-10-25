@@ -62,7 +62,7 @@ class GarbageQuickSortRobotROSCustomTraj:
 
         # check if goal is commanded
         self.goal_commanded = False
-        self.goal_tolerance = np.array([0.12, 0.12, 0.12, 0.12])
+        self.goal_tolerance = np.array([0.15, 0.15, 0.15, 0.15])
         # 0 is no goal received, 1 is in progress, 2 is failure, 3 is success
         self.reached_goal = 0
         self.goal_receive_time = None
@@ -70,7 +70,7 @@ class GarbageQuickSortRobotROSCustomTraj:
 
         # an attempt to solve the constant offset
         # offset assumed to be proportional to torque experienced (COM calculated)
-        self.home_offset = np.array([0.05, 0.11, 0.24, 0.00]) 
+        self.home_offset = np.array([0.05, 0.13, 0.22, 0.00]) 
 
         self.ik_soln_exists = False
         self.traj_success = False
