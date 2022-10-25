@@ -70,14 +70,14 @@ class GarbageQuickSortRobotROSCustomTraj:
 
         # an attempt to solve the constant offset
         # offset assumed to be proportional to torque experienced (COM calculated)
-        self.home_offset = np.array([0.05, 0.13, 0.22, 0.00]) 
+        self.home_offset = np.array([0.026, 0.127, 0.214, 0.00]) 
 
         self.ik_soln_exists = False
         self.traj_success = False
 
         # time to cover 1rad angle (based on max angle to cover)
         self.traj_duration_global = 0.25
-        self.time_per_rad = 0.5
+        self.time_per_rad = 0.35
         self.number_time_steps = 2
 
         # monitor if need to be activated
@@ -400,6 +400,10 @@ class GarbageQuickSortRobotROSCustomTraj:
                     self.custom_traj_success = False
                     return 
 
+                # publish RViz for visualization
+                self.move_group.go(moveit_goal_joint_vals)
+                self.move_group.stop()
+
                 # send the smooth goal to servo
                 self.joint_goal_publisher.publish(revise_plan)
 
@@ -409,10 +413,6 @@ class GarbageQuickSortRobotROSCustomTraj:
                 self.goal_receive_time = rospy.Time.now()
 
                 self.robot_pose = pose
-
-                # publish RViz for visualization
-                self.move_group.go(moveit_goal_joint_vals)
-                self.move_group.stop()
 
         else:
             print("Joint goal received when not active! Ignoring request!")

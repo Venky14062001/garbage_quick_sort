@@ -378,63 +378,63 @@ class Detection:
 
 
     # function to get the average (x,y) taking input the 100 frames from camera
-    def get_detection_avg(self, frames_input):
-        # first frame info is of type TargetsInfoPerFrame
-        first_frame_info_l = frames_input.target_info[0].target_info
-        # final array after collating 99 frames info
-        final_frame_info_l = deepcopy(first_frame_info_l)
-        # first frame arr and final frame arr are of type TargetCenter
-        # create a list to keep track of how many times an object has been added confidence
-        no_of_times_l = [1] * len(first_frame_info_l)
+    # def get_detection_avg(self, frames_input):
+    #     # first frame info is of type TargetsInfoPerFrame
+    #     first_frame_info_l = frames_input.target_info[0].target_info
+    #     # final array after collating 99 frames info
+    #     final_frame_info_l = deepcopy(first_frame_info_l)
+    #     # first frame arr and final frame arr are of type TargetCenter
+    #     # create a list to keep track of how many times an object has been added confidence
+    #     no_of_times_l = [1] * len(first_frame_info_l)
 
-        # loop through the rest 99 frames and keep adding corresponding confidences to first frame array
-        for i in range(1, len(frames_input.target_info)):
-            # get the current frame details
-            curr_frame_info_arr_l = frames_input.target_info[i].target_info
-            # loop through curr_frame_info_arr_data to find the location of each object and confidence and match
-            for object_num, object in enumerate(curr_frame_info_arr_l):
-                object_x = object.x
-                object_y = object.y
-                object_conf = object.conf
+    #     # loop through the rest 99 frames and keep adding corresponding confidences to first frame array
+    #     for i in range(1, len(frames_input.target_info)):
+    #         # get the current frame details
+    #         curr_frame_info_arr_l = frames_input.target_info[i].target_info
+    #         # loop through curr_frame_info_arr_data to find the location of each object and confidence and match
+    #         for object_num, object in enumerate(curr_frame_info_arr_l):
+    #             object_x = object.x
+    #             object_y = object.y
+    #             object_conf = object.conf
 
-                for first_object_num, first_object in enumerate(first_frame_info_l):
-                    # get the x,y of this object
-                    first_object_x = first_object.x
-                    first_object_y = first_object.y
+    #             for first_object_num, first_object in enumerate(first_frame_info_l):
+    #                 # get the x,y of this object
+    #                 first_object_x = first_object.x
+    #                 first_object_y = first_object.y
 
-                    x_diff = abs(first_object_x - object_x)
-                    y_diff = abs(first_object_y - object_y)
+    #                 x_diff = abs(first_object_x - object_x)
+    #                 y_diff = abs(first_object_y - object_y)
 
-                    if ((x_diff <= self.object_x_tolerance) and (y_diff <= self.object_y_tolerance)):
-                        if (first_object.object_class == object.object_class):
-                            # add the confidence and (x,y) for this object
-                            final_frame_info_l[first_object_num].x += object_x
-                            final_frame_info_l[first_object_num].y += object_y
+    #                 if ((x_diff <= self.object_x_tolerance) and (y_diff <= self.object_y_tolerance)):
+    #                     if (first_object.object_class == object.object_class):
+    #                         # add the confidence and (x,y) for this object
+    #                         final_frame_info_l[first_object_num].x += object_x
+    #                         final_frame_info_l[first_object_num].y += object_y
 
-                            final_frame_info_l[first_object_num].conf += object_conf
+    #                         final_frame_info_l[first_object_num].conf += object_conf
 
-                            no_of_times_l[first_object_num] += 1
-                            # break out of this loop, now check for next object
-                            break
-                        # the object class is not same, pass
-                        else:
-                            pass
-                    # the object is not close by, pass
-                    else:
-                        pass
+    #                         no_of_times_l[first_object_num] += 1
+    #                         # break out of this loop, now check for next object
+    #                         break
+    #                     # the object class is not same, pass
+    #                     else:
+    #                         pass
+    #                 # the object is not close by, pass
+    #                 else:
+    #                     pass
 
-        # now loop through the entire final_frame_info_l to find the highest confidence object
-        max_conf_obj = final_frame_info_l[0]
-        max_conf_obj_num = 0
-        for j_num, j in enumerate(final_frame_info_l):
-            if (j.conf > max_conf_obj.conf):
-                max_conf_obj = final_frame_info_l[j_num]
-                max_conf_obj_num = j_num
-            else:
-                pass
+    #     # now loop through the entire final_frame_info_l to find the highest confidence object
+    #     max_conf_obj = final_frame_info_l[0]
+    #     max_conf_obj_num = 0
+    #     for j_num, j in enumerate(final_frame_info_l):
+    #         if (j.conf > max_conf_obj.conf):
+    #             max_conf_obj = final_frame_info_l[j_num]
+    #             max_conf_obj_num = j_num
+    #         else:
+    #             pass
 
-        # now get the average (x,y) for the max_conf_obj
-        avg_x = max_conf_obj.x / no_of_times_l[max_conf_obj_num]
-        avg_y = max_conf_obj.y / no_of_times_l[max_conf_obj_num]
+    #     # now get the average (x,y) for the max_conf_obj
+    #     avg_x = max_conf_obj.x / no_of_times_l[max_conf_obj_num]
+    #     avg_y = max_conf_obj.y / no_of_times_l[max_conf_obj_num]
 
-        return avg_x, avg_y
+    #     return avg_x, avg_y
