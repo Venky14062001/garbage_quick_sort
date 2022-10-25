@@ -100,12 +100,7 @@ class Detection:
 
         rospy.loginfo("Service started")
 
-        '''Client'''
-        # rospy.wait_for_service('/garbage_quick_sort/effector_pose_service')
-        # try:
-        #     self.detect_pose_client = rospy.ServiceProxy("/garbage_quick_sort/effector_pose_service", EffectorPoseFbk)
-        # except rospy.ServiceException as e:
-        #     print("Detect pose service object failed: ", e)
+        self.detection_image_pub = rospy.Publisher("/garbage_quick_sort/detect_garbage", Image, queue_size=10)
 
         '''Color Detection'''
         self.boundaries = { # hsv color boundaries
@@ -189,9 +184,6 @@ class Detection:
     def inference(self):
         if self.start_image:
 
-            if self.is_moving():
-                return
-
             z_value = self.camera_height
 
             im, im0 = self.preprocess(self.bgr_image)
@@ -251,21 +243,23 @@ class Detection:
                 self.bgr_image = cv2.circle(self.bgr_image, [self.obj_center[0], self.obj_center[1]], 2,(0,255,0),2) # show target center point
                 # Stream results
                 im0 = annotator.result()
+                
+                if not self.is_moving():
 
-                x,y = self.pixel2xy(self.obj_center[0], self.obj_center[1], z_value) # calculate target x, y distance from camera center frame
+                    x,y = self.pixel2xy(self.obj_center[0], self.obj_center[1], z_value) # calculate target x, y distance from camera center frame
 
-                self.end_effector_target_pose = EffectorPose()
-                self.end_effector_target_pose.x = x
-                self.end_effector_target_pose.y = y
-                self.end_effector_target_pose.z = z_value # give the same z_pose 
-                self.end_effector_target_pose.phi = -np.pi/2 # maybe software can later provide this also :P , right now irrelevant because not used
+                    self.end_effector_target_pose = EffectorPose()
+                    self.end_effector_target_pose.x = x
+                    self.end_effector_target_pose.y = y
+                    self.end_effector_target_pose.z = z_value # give the same z_pose 
+                    self.end_effector_target_pose.phi = -np.pi/2 # maybe software can later provide this also :P , right now irrelevant because not used
 
                 # self.frame_info_collection(bounding_boxes, z_value)
-
 
             else:
                 self.goal_status = 1 # not found/in progress
 
+            self.detection_image_pub.publish(self.br.cv2_to_imgmsg(self.bgr_image, "bgr8"))
             cv2.imshow(str(0), self.bgr_image)
             cv2.waitKey(1)
 
