@@ -22,7 +22,7 @@ class ArduinoHandler:
 		self.global_state_sub = rospy.Subscriber('/garbage_quick_sort/global_state', RobotState, self.global_state_callback)
 		self.ultrasonic_sensor_sub = rospy.Subscriber('/garbage_quick_sort/arduino/distance', Float32, self.distance_msg_callback)
 
-		self.distance_roll_mean_size = 40
+		self.distance_roll_mean_size = 20
 		self.distance_roll_mean_buffer = np.zeros(self.distance_roll_mean_size)
 		self.roll_mean_index = 0
 

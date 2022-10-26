@@ -62,7 +62,7 @@ class GarbageQuickSortRobotROSCustomTraj:
 
         # check if goal is commanded
         self.goal_commanded = False
-        self.goal_tolerance = np.array([0.15, 0.15, 0.15, 0.15])
+        self.goal_tolerance = np.array([0.15, 0.18, 0.15, 0.15])
         # 0 is no goal received, 1 is in progress, 2 is failure, 3 is success
         self.reached_goal = 0
         self.goal_receive_time = None

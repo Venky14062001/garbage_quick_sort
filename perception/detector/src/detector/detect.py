@@ -133,7 +133,7 @@ class Detection:
         res = EffectorPoseFbkResponse()
         res.type = self.type_of_garbage # 1: cardboard, 2: metal, 3: plastic
         res.pose_value = self.end_effector_target_pose 
-
+        
         return res
 
     def frames_info_callback(self, req):
@@ -184,6 +184,9 @@ class Detection:
     def inference(self):
         if self.start_image:
 
+            if self.is_moving():
+                return
+
             z_value = self.camera_height
 
             im, im0 = self.preprocess(self.bgr_image)
@@ -223,8 +226,10 @@ class Detection:
 
                     # bounding_box_area = (bounding_box.xmax - bounding_box.xmin) * (bounding_box.ymax - bounding_box.ymin)
 
-                    if (bounding_box.xmax - bounding_box.xmin) > (self.image_width - 100) or (bounding_box.ymax - bounding_box.ymin) > (self.image_height - 80):
-                        # print(bounding_box.xmax - bounding_box.xmin, bounding_box.ymax - bounding_box.ymin)
+                    if (bounding_box.xmax - bounding_box.xmin) > (self.image_width - 100) or \
+                        (bounding_box.ymax - bounding_box.ymin) > (self.image_height - 80) or \
+                        (bounding_box.xmax - bounding_box.xmin) < 50 or \
+                        (bounding_box.ymax - bounding_box.ymin) < 50:                        
                         continue
 
                     if conf > highest_conf:
@@ -241,18 +246,18 @@ class Detection:
                         annotator.box_label(xyxy, label, color=colors(c, True))
 
                 self.bgr_image = cv2.circle(self.bgr_image, [self.obj_center[0], self.obj_center[1]], 2,(0,255,0),2) # show target center point
+                self.bgr_image = cv2.putText(self.bgr_image, 'Target', (self.obj_center[0], self.obj_center[1]), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2, cv2.LINE_AA)
                 # Stream results
                 im0 = annotator.result()
                 
-                if not self.is_moving():
 
-                    x,y = self.pixel2xy(self.obj_center[0], self.obj_center[1], z_value) # calculate target x, y distance from camera center frame
+                x,y = self.pixel2xy(self.obj_center[0], self.obj_center[1], z_value) # calculate target x, y distance from camera center frame
 
-                    self.end_effector_target_pose = EffectorPose()
-                    self.end_effector_target_pose.x = x
-                    self.end_effector_target_pose.y = y
-                    self.end_effector_target_pose.z = z_value # give the same z_pose 
-                    self.end_effector_target_pose.phi = -np.pi/2 # maybe software can later provide this also :P , right now irrelevant because not used
+                self.end_effector_target_pose = EffectorPose()
+                self.end_effector_target_pose.x = x
+                self.end_effector_target_pose.y = y
+                self.end_effector_target_pose.z = z_value # give the same z_pose 
+                self.end_effector_target_pose.phi = -np.pi/2 # maybe software can later provide this also :P , right now irrelevant because not used
 
                 # self.frame_info_collection(bounding_boxes, z_value)
 
@@ -260,8 +265,8 @@ class Detection:
                 self.goal_status = 1 # not found/in progress
 
             self.detection_image_pub.publish(self.br.cv2_to_imgmsg(self.bgr_image, "bgr8"))
-            cv2.imshow(str(0), self.bgr_image)
-            cv2.waitKey(1)
+            # cv2.imshow(str(0), self.bgr_image)
+            # cv2.waitKey(1)
 
     def pixel2xy(self, pixel_x, pixel_y, z): # take center as origin, z in meter
         z *= 100

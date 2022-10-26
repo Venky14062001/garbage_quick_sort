@@ -189,7 +189,7 @@ class GarbageQuickSortRobotStateMachine:
 
                         self.down_global_target_pose.x = global_target[0]
                         self.down_global_target_pose.y = global_target[1]
-                        self.down_global_target_pose.z = 0.01 # putting a very low target, need to test
+                        self.down_global_target_pose.z = 0.03 # putting a very low target, need to test
                         self.down_global_target_pose.phi = -1.571 
 
                         self.state = RobotStateEnum.GoPickUpLoc
